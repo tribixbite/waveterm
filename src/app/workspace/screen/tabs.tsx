@@ -17,6 +17,7 @@ import { ReactComponent as ActionsIcon } from "../../assets/icons/tab/actions.sv
 import { ReactComponent as AddIcon } from "../../assets/icons/add.svg";
 import * as constants from "../../appconst";
 import { Reorder } from "framer-motion";
+import { debounce } from "throttle-debounce";
 import { MagicLayout } from "../../magiclayout";
 
 import "../workspace.less";
@@ -86,11 +87,11 @@ class ScreenTabs extends React.Component<{ session: Session }, { showingScreens:
 
         // Add the current deltaY to the history
         this.deltaYHistory.push(Math.abs(event.deltaY));
-        if (this.deltaYHistory.length > 5) {
-            this.deltaYHistory.shift(); // Keep only the last 5 entries
+        if (this.deltaYHistory.length > 2) {
+            this.deltaYHistory.shift(); // Keep only the last 2 entries
         }
 
-        // Check if any of the last 5 deltaY values are greater than a threshold
+        // Check if any of the last 2 deltaY values are greater than a threshold
         let isMouseWheel = this.deltaYHistory.some((deltaY) => deltaY > 0);
 
         if (isMouseWheel) {
@@ -108,7 +109,8 @@ class ScreenTabs extends React.Component<{ session: Session }, { showingScreens:
 
         // Add the wheel event listener to the tabsRef
         if (this.tabsRef.current) {
-            this.tabsRef.current.addEventListener("wheel", this.handleWheel, { passive: false });
+            let handleWheel = debounce(200, this.handleWheel);
+            this.tabsRef.current.addEventListener("wheel", handleWheel, { passive: false });
         }
     }
 
