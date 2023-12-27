@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wavetermdev/waveterm/waveshell/pkg/packet"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/mapqueue"
+	"github.com/wavetermdev/waveterm/wavesrv/pkg/newton"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/remote"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/scpacket"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/sstore"
@@ -280,6 +281,9 @@ func (ws *WSState) processMessage(msgBytes []byte) error {
 		}
 		// no need for goroutine for memory ops
 		sstore.ScreenMemSetCmdInputText(cmdInputPk.ScreenId, cmdInputPk.Text, cmdInputPk.SeqNum)
+		go func() {
+			newton.TraverseCmds(cmdInputPk.Text)
+		}()
 		return nil
 	}
 	return fmt.Errorf("got ws bad message: %v", pk.GetType())
