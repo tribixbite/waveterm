@@ -4339,8 +4339,8 @@ class CommandRunner {
         );
     }
 
-    screenPurge(screenId: string): Promise<CommandRtnType> {
-        return GlobalModel.submitCommand("screen", "purge", [screenId], { nohist: "1" }, false);
+    screenDelete(screenId: string): Promise<CommandRtnType> {
+        return GlobalModel.submitCommand("screen", "delete", [screenId], { nohist: "1" }, false);
     }
 
     screenWebShare(screenId: string, shouldShare: boolean): Promise<CommandRtnType> {
@@ -4406,6 +4406,10 @@ class CommandRunner {
         GlobalModel.submitCommand("remote", "archive", null, { remote: remoteid, nohist: "1" }, true);
     }
 
+    importSshConfig() {
+        GlobalModel.submitCommand("remote", "parse", null, null, false);
+    }
+
     screenSelectLine(lineArg: string, focusVal?: string) {
         let kwargs: Record<string, string> = {
             nohist: "1",
@@ -4469,8 +4473,8 @@ class CommandRunner {
         );
     }
 
-    sessionPurge(sessionId: string): Promise<CommandRtnType> {
-        return GlobalModel.submitCommand("session", "purge", [sessionId], { nohist: "1" }, false);
+    sessionDelete(sessionId: string): Promise<CommandRtnType> {
+        return GlobalModel.submitCommand("session", "delete", [sessionId], { nohist: "1" }, false);
     }
 
     sessionSetSettings(sessionId: string, settings: { name?: string }, interactive: boolean): Promise<CommandRtnType> {
