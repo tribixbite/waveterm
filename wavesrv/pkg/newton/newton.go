@@ -3,6 +3,7 @@ package newton
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -58,12 +59,14 @@ type CmdSet struct {
 	get func() *set.Set[string]
 }
 
+const NewtonDir = "/Users/evan/source/newton/x"
+
 // Initialize the CmdSet singleton.
 func getCmdSet() CmdSet {
 	return CmdSet{
 		get: sync.OnceValue[*set.Set[string]](func() *set.Set[string] {
 			var cmds CmdList
-			err := utilfn.ReadJsonFile("/Users/evan/source/newton/x/index.json", &cmds)
+			err := utilfn.ReadJsonFile(filepath.Join(NewtonDir, "index.json"), &cmds)
 			if err != nil {
 				fmt.Printf("error reading json file: %v\n", err)
 				return nil
@@ -74,7 +77,7 @@ func getCmdSet() CmdSet {
 }
 
 // Parses a command string to exract the last command and its arguments.
-func ParseCommand(cmdStr string) (cmd string, args []string, err error) {
+func parseCommand(cmdStr string) (cmd string, args []string, err error) {
 	cmdReader := strings.NewReader(cmdStr)
 	parser := syntax.NewParser(syntax.Variant(syntax.LangBash))
 	file, err := parser.Parse(cmdReader, "")
@@ -106,6 +109,17 @@ func ParseCommand(cmdStr string) (cmd string, args []string, err error) {
 	return cmd, args, nil
 }
 
+type CmdSuggestion interface{}
+
+func getCmdSuggestion(cmd string) (CmdSuggestion, error) {
+	var cmdSuggestion CmdSuggestion
+	err := utilfn.ReadJsonFile(filepath.Join(NewtonDir, fmt.Sprintf("%s.json", cmd)), &cmdSuggestion)
+	if err != nil {
+		return nil, fmt.Errorf("error reading json file: %v", err)
+	}
+	return cmdSuggestion, nil
+}
+
 // CmdSet singleton.
 var cmdSet = getCmdSet()
 
@@ -115,7 +129,7 @@ func GetSuggestions(cmdStr utilfn.StrWithPos) error {
 		return nil
 	}
 
-	cmd, args, err := ParseCommand(cmdStr.Str)
+	cmd, args, err := parseCommand(cmdStr.Str)
 	if err != nil {
 		return fmt.Errorf("error parsing command: %w", err)
 	}
@@ -141,6 +155,12 @@ func GetSuggestions(cmdStr utilfn.StrWithPos) error {
 	}
 
 	fmt.Printf("using cmd \"%s\" and args \"%v\"", cmd, args)
+	cmdSuggestion, err := getCmdSuggestion(cmd)
+	if err != nil {
+		return fmt.Errorf("error getting cmd suggestion: %w", err)
+	}
+
+	fmt.Printf("cmdSuggestion: %v\n", cmdSuggestion)
 
 	return nil
 }
