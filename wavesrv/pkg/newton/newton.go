@@ -9,6 +9,47 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// Recurse through a syntax.Stmt and find the last statement that wraps an expression.
+func findLastStmtWithExpr(stmt *syntax.Stmt) *syntax.Stmt {
+	switch x := stmt.Cmd.(type) {
+	case *syntax.BinaryCmd:
+		if x.Y != nil {
+			return findLastStmtWithExpr(x.Y)
+		} else {
+			return findLastStmtWithExpr(x.X)
+		}
+	case *syntax.CallExpr:
+		return stmt
+	default:
+		return nil
+	}
+}
+
+// Parse a syntax.Word into a complete string.
+func getWordStr(word *syntax.Word) string {
+	wordBuf := new(bytes.Buffer)
+	for _, part := range word.Parts {
+		switch x := part.(type) {
+		case *syntax.Lit:
+			wordBuf.WriteString(x.Value)
+		case *syntax.SglQuoted:
+			wordBuf.WriteString(fmt.Sprintf("'%s'", x.Value))
+		case *syntax.DblQuoted:
+			wordBuf.WriteByte('"')
+			for _, part := range x.Parts {
+				switch x := part.(type) {
+				case *syntax.Lit:
+					wordBuf.WriteString(x.Value)
+				case *syntax.ParamExp:
+					wordBuf.WriteString(x.Param.Value)
+				}
+			}
+			wordBuf.WriteByte('"')
+		}
+	}
+	return wordBuf.String()
+}
+
 func TraverseCmds(cmdStr utilfn.StrWithPos) error {
 	if cmdStr.Str == "" {
 		return nil
@@ -19,63 +60,30 @@ func TraverseCmds(cmdStr utilfn.StrWithPos) error {
 	if err != nil {
 		return fmt.Errorf("error parsing command: %w", err)
 	}
-	// syntax.Walk(file, func(node syntax.Node) bool {
-	// 	switch x := node.(type) {
-	// 	case *syntax.ParamExp:
-	// 		x.Param.Value = strings.ToUpper(x.Param.Value)
-	// 	}
-	// 	return true
-	// })
-	// syntax.NewPrinter().Print(os.Stdout, file)
-	exprs := []*syntax.CallExpr{}
-	stmts := []*syntax.Stmt{}
-	debugStr := new(bytes.Buffer)
-	syntax.DebugPrint(debugStr, file)
-	fmt.Sprintln(debugStr.String())
 
-	syntax.Walk(file, func(node syntax.Node) bool {
-		switch x := node.(type) {
-		case *syntax.CallExpr:
-			exprs = append(exprs, x)
-		case *syntax.Stmt:
-			stmts = append(stmts, x)
-		}
-		return true
-	})
-	lastExpr := exprs[len(exprs)-1]
-	lastExprStr := new(bytes.Buffer)
-	for _, arg := range lastExpr.Args {
-		lastExprStr.WriteString(arg.Lit())
+	// syntax.DebugPrint(os.Stdout, file)
+
+	// Take the last statement and recurse it to find the last statement that wraps an expression.
+	lastStmt := findLastStmtWithExpr(file.Stmts[len(file.Stmts)-1])
+
+	if lastStmt == nil {
+		return fmt.Errorf("error finding last statement")
 	}
 
-	lastStmt := stmts[len(stmts)-1]
-	lastStmtStr := new(bytes.Buffer)
-	for _, arg := range lastStmt.Cmd.(*syntax.CallExpr).Args {
-		for _, part := range arg.Parts {
-			switch x := part.(type) {
-			case *syntax.Lit:
-				lastStmtStr.WriteString(x.Value)
-			case *syntax.SglQuoted:
-				lastStmtStr.WriteString(fmt.Sprintf("'%s'", x.Value))
-			case *syntax.DblQuoted:
-				lastStmtStr.WriteByte('"')
-				for _, part := range x.Parts {
-					switch x := part.(type) {
-					case *syntax.Lit:
-						lastStmtStr.WriteString(x.Value)
-					case *syntax.ParamExp:
-						lastStmtStr.WriteString(x.Param.Value)
-					}
-				}
-				lastStmtStr.WriteByte('"')
-			}
-		}
+	if lastStmt.Redirs != nil {
+		fmt.Println("contains redirects, ignoring parsing")
+		return nil
 	}
 
-	for _, redir := range lastStmt.Redirs {
-		lastStmtStr.WriteString(redir.Op.String())
-		lastStmtStr.WriteString(redir.Word.Lit())
+	cmd := getWordStr(lastStmt.Cmd.(*syntax.CallExpr).Args[0])
+	args := make([]string, len(lastStmt.Cmd.(*syntax.CallExpr).Args)-1)
+
+	for i, arg := range lastStmt.Cmd.(*syntax.CallExpr).Args[1:] {
+		args[i] = getWordStr(arg)
 	}
-	fmt.Printf("last statement: %s\n", lastStmtStr.String())
+
+	fmt.Printf("cmd: %s\n", cmd)
+	fmt.Printf("args: %v\n", args)
+
 	return nil
 }
