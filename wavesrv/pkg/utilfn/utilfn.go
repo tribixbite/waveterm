@@ -4,10 +4,15 @@
 package utilfn
 
 import (
+	"bufio"
 	"crypto/sha1"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"math"
+	"os"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -246,4 +251,34 @@ func AddIntSlice(vals ...int) (int, error) {
 		}
 	}
 	return rtn, nil
+}
+
+// Read a file into a byte slice.
+func ReadFileToBuf(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %v", err)
+	}
+	// Get the file size
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("error getting file stat: %v", err)
+	}
+
+	// Read the file into a byte slice
+	bs := make([]byte, stat.Size())
+	_, err = bufio.NewReader(file).Read(bs)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("error reading file: %v", err)
+	}
+	return bs, nil
+}
+
+// Read a JSON file into a struct.
+func ReadJsonFile(path string, v interface{}) error {
+	bs, err := ReadFileToBuf(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bs, v)
 }

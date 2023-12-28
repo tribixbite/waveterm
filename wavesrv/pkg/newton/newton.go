@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 
+	"github.com/hashicorp/go-set/v2"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/utilfn"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -50,15 +52,34 @@ func getWordStr(word *syntax.Word) string {
 	return wordBuf.String()
 }
 
-func TraverseCmds(cmdStr utilfn.StrWithPos) error {
-	if cmdStr.Str == "" {
-		return nil
+type CmdList []string
+type CmdSet struct {
+	// OnceValue gets the CmdSet singleton.
+	get func() *set.Set[string]
+}
+
+// Initialize the CmdSet singleton.
+func getCmdSet() CmdSet {
+	return CmdSet{
+		get: sync.OnceValue[*set.Set[string]](func() *set.Set[string] {
+			var cmds CmdList
+			err := utilfn.ReadJsonFile("/Users/evan/source/newton/x/index.json", &cmds)
+			if err != nil {
+				fmt.Printf("error reading json file: %v\n", err)
+				return nil
+			}
+			return set.From[string](cmds)
+		}),
 	}
-	cmdReader := strings.NewReader(cmdStr.Str)
+}
+
+// Parses a command string to exract the last command and its arguments.
+func ParseCommand(cmdStr string) (cmd string, args []string, err error) {
+	cmdReader := strings.NewReader(cmdStr)
 	parser := syntax.NewParser(syntax.Variant(syntax.LangBash))
 	file, err := parser.Parse(cmdReader, "")
 	if err != nil {
-		return fmt.Errorf("error parsing command: %w", err)
+		return "", nil, fmt.Errorf("error parsing command: %w", err)
 	}
 
 	// syntax.DebugPrint(os.Stdout, file)
@@ -67,23 +88,59 @@ func TraverseCmds(cmdStr utilfn.StrWithPos) error {
 	lastStmt := findLastStmtWithExpr(file.Stmts[len(file.Stmts)-1])
 
 	if lastStmt == nil {
-		return fmt.Errorf("error finding last statement")
+		return "", nil, fmt.Errorf("error finding last statement")
 	}
 
 	if lastStmt.Redirs != nil {
 		fmt.Println("contains redirects, ignoring parsing")
-		return nil
+		return "", nil, nil
 	}
 
-	cmd := getWordStr(lastStmt.Cmd.(*syntax.CallExpr).Args[0])
-	args := make([]string, len(lastStmt.Cmd.(*syntax.CallExpr).Args)-1)
+	cmd = getWordStr(lastStmt.Cmd.(*syntax.CallExpr).Args[0])
+	args = make([]string, len(lastStmt.Cmd.(*syntax.CallExpr).Args)-1)
 
 	for i, arg := range lastStmt.Cmd.(*syntax.CallExpr).Args[1:] {
 		args[i] = getWordStr(arg)
 	}
 
+	return cmd, args, nil
+}
+
+// CmdSet singleton.
+var cmdSet = getCmdSet()
+
+// GetSuggestions takes a StrWithPos and returns autocomplete suggestions for the command.
+func GetSuggestions(cmdStr utilfn.StrWithPos) error {
+	if cmdStr.Str == "" {
+		return nil
+	}
+
+	cmd, args, err := ParseCommand(cmdStr.Str)
+	if err != nil {
+		return fmt.Errorf("error parsing command: %w", err)
+	}
+
+	cmdAlt := ""
+	if len(args) > 0 {
+		cmdAlt = fmt.Sprintf("%s/%s", cmd, args[0])
+	}
+
 	fmt.Printf("cmd: %s\n", cmd)
 	fmt.Printf("args: %v\n", args)
+
+	if cmdSet.get().Contains(cmdAlt) {
+		// If the cmdAlt is available, use it and adjust the args.
+		fmt.Printf("cmdAlt \"%s\" is available\n", cmdAlt)
+		cmd = cmdAlt
+		args = args[1:]
+	} else if cmdSet.get().Contains(cmd) {
+		fmt.Printf("cmd \"%s\" available\n", cmd)
+	} else {
+		fmt.Printf("neither cmd \"%s\" nor cmdAlt \"%s\" are available\n", cmd, cmdAlt)
+		return nil
+	}
+
+	fmt.Printf("using cmd \"%s\" and args \"%v\"", cmd, args)
 
 	return nil
 }

@@ -1,6 +1,8 @@
 module github.com/wavetermdev/waveterm/wavesrv
 
-go 1.18
+go 1.21
+
+toolchain go1.21.5
 
 require (
 	github.com/alessio/shellescape v1.4.1
@@ -25,6 +27,7 @@ require (
 	github.com/google/go-github/v57 v57.0.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/hashicorp/go-set/v2 v2.1.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 )
 

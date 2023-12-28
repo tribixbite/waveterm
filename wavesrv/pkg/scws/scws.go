@@ -282,7 +282,7 @@ func (ws *WSState) processMessage(msgBytes []byte) error {
 		// no need for goroutine for memory ops
 		sstore.ScreenMemSetCmdInputText(cmdInputPk.ScreenId, cmdInputPk.Text, cmdInputPk.SeqNum)
 		go func() {
-			newton.TraverseCmds(cmdInputPk.Text)
+			newton.GetSuggestions(cmdInputPk.Text)
 		}()
 		return nil
 	}
