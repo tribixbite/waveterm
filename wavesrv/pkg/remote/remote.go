@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/armon/circbuf"
 	"github.com/creack/pty"
 	"github.com/google/uuid"
@@ -66,9 +67,9 @@ func MakeLocalMShellCommandStr(isSudo bool) (string, error) {
 		return "", err
 	}
 	if isSudo {
-		return fmt.Sprintf(`%s; sudo %s --server`, PrintPingPacket, mshellPath), nil
+		return fmt.Sprintf(`%s; sudo %s --server`, PrintPingPacket, shellescape.Quote(mshellPath)), nil
 	} else {
-		return fmt.Sprintf(`%s; %s --server`, PrintPingPacket, mshellPath), nil
+		return fmt.Sprintf(`%s; %s --server`, PrintPingPacket, shellescape.Quote(mshellPath)), nil
 	}
 }
 
@@ -1125,6 +1126,9 @@ func addScVarsToState(state *packet.ShellState) *packet.ShellState {
 	envMap := shexec.DeclMapFromState(&rtn)
 	envMap["PROMPT"] = &shexec.DeclareDeclType{Name: "PROMPT", Value: "1", Args: "x"}
 	envMap["PROMPT_VERSION"] = &shexec.DeclareDeclType{Name: "PROMPT_VERSION", Value: scbase.WaveVersion, Args: "x"}
+	if _, exists := envMap["LANG"]; !exists {
+		envMap["LANG"] = &shexec.DeclareDeclType{Name: "LANG", Value: scbase.DetermineLang(), Args: "x"}
+	}
 	rtn.ShellVars = shexec.SerializeDeclMap(envMap)
 	return &rtn
 }

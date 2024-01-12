@@ -8,6 +8,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/wavetermdev/waveterm/waveshell/pkg/packet"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/utilfn"
 )
 
@@ -38,28 +39,30 @@ func (*PtyDataUpdate) UpdateType() string {
 func (pdu *PtyDataUpdate) Clean() {}
 
 type ModelUpdate struct {
-	Sessions          []*SessionType          `json:"sessions,omitempty"`
-	ActiveSessionId   string                  `json:"activesessionid,omitempty"`
-	Screens           []*ScreenType           `json:"screens,omitempty"`
-	ScreenLines       *ScreenLinesType        `json:"screenlines,omitempty"`
-	Line              *LineType               `json:"line,omitempty"`
-	Lines             []*LineType             `json:"lines,omitempty"`
-	Cmd               *CmdType                `json:"cmd,omitempty"`
-	CmdLine           *utilfn.StrWithPos      `json:"cmdline,omitempty"`
-	Info              *InfoMsgType            `json:"info,omitempty"`
-	ClearInfo         bool                    `json:"clearinfo,omitempty"`
-	Remotes           []RemoteRuntimeState    `json:"remotes,omitempty"`
-	History           *HistoryInfoType        `json:"history,omitempty"`
-	Interactive       bool                    `json:"interactive"`
-	Connect           bool                    `json:"connect,omitempty"`
-	MainView          string                  `json:"mainview,omitempty"`
-	Bookmarks         []*BookmarkType         `json:"bookmarks,omitempty"`
-	SelectedBookmark  string                  `json:"selectedbookmark,omitempty"`
-	HistoryViewData   *HistoryViewData        `json:"historyviewdata,omitempty"`
-	ClientData        *ClientData             `json:"clientdata,omitempty"`
-	RemoteView        *RemoteViewType         `json:"remoteview,omitempty"`
-	ScreenTombstones  []*ScreenTombstoneType  `json:"screentombstones,omitempty"`
-	SessionTombstones []*SessionTombstoneType `json:"sessiontombstones,omitempty"`
+	Sessions          []*SessionType                     `json:"sessions,omitempty"`
+	ActiveSessionId   string                             `json:"activesessionid,omitempty"`
+	Screens           []*ScreenType                      `json:"screens,omitempty"`
+	ScreenLines       *ScreenLinesType                   `json:"screenlines,omitempty"`
+	Line              *LineType                          `json:"line,omitempty"`
+	Lines             []*LineType                        `json:"lines,omitempty"`
+	Cmd               *CmdType                           `json:"cmd,omitempty"`
+	CmdLine           *utilfn.StrWithPos                 `json:"cmdline,omitempty"`
+	Info              *InfoMsgType                       `json:"info,omitempty"`
+	ClearInfo         bool                               `json:"clearinfo,omitempty"`
+	Remotes           []RemoteRuntimeState               `json:"remotes,omitempty"`
+	History           *HistoryInfoType                   `json:"history,omitempty"`
+	Interactive       bool                               `json:"interactive"`
+	Connect           bool                               `json:"connect,omitempty"`
+	MainView          string                             `json:"mainview,omitempty"`
+	Bookmarks         []*BookmarkType                    `json:"bookmarks,omitempty"`
+	SelectedBookmark  string                             `json:"selectedbookmark,omitempty"`
+	HistoryViewData   *HistoryViewData                   `json:"historyviewdata,omitempty"`
+	ClientData        *ClientData                        `json:"clientdata,omitempty"`
+	RemoteView        *RemoteViewType                    `json:"remoteview,omitempty"`
+	ScreenTombstones  []*ScreenTombstoneType             `json:"screentombstones,omitempty"`
+	SessionTombstones []*SessionTombstoneType            `json:"sessiontombstones,omitempty"`
+	OpenAICmdInfoChat []*packet.OpenAICmdInfoChatMessage `json:"openaicmdinfochat,omitempty"`
+	AlertMessage      *AlertMessageType                  `json:"alertmessage,omitempty"`
 }
 
 func (*ModelUpdate) UpdateType() string {
@@ -126,6 +129,13 @@ type RemoteEditType struct {
 	InfoStr     string `json:"infostr,omitempty"`
 	KeyStr      string `json:"keystr,omitempty"`
 	HasPassword bool   `json:"haspassword,omitempty"`
+}
+
+type AlertMessageType struct {
+	Title    string `json:"title,omitempty"`
+	Message  string `json:"message"`
+	Confirm  bool   `json:"confirm,omitempty"`
+	Markdown bool   `json:"markdown,omitempty"`
 }
 
 type InfoMsgType struct {

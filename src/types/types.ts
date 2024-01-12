@@ -265,6 +265,20 @@ type ScreenLinesType = {
     cmds: CmdDataType[];
 };
 
+type OpenAIPacketOutputType = {
+    model: string;
+    created: number;
+    finish_reason: string;
+    message: string;
+    error?: string;
+};
+
+type OpenAICmdInfoChatMessageType = {
+    isassistantresponse?: boolean;
+    assistantresponse?: OpenAIPacketOutputType;
+    userquery?: string;
+};
+
 type ModelUpdateType = {
     interactive: boolean;
     sessions?: SessionDataType[];
@@ -285,6 +299,8 @@ type ModelUpdateType = {
     clientdata?: ClientDataType;
     historyviewdata?: HistoryViewDataType;
     remoteview?: RemoteViewType;
+    openaicmdinfochat?: OpenAICmdInfoChatMessageType[];
+    alertmessage?: AlertMessageType;
 };
 
 type HistoryViewDataType = {
@@ -472,10 +488,15 @@ type FeOptsType = {
     termfontsize: number;
 };
 
+type ConfirmFlagsType = {
+    [k: string]: boolean;
+};
+
 type ClientOptsType = {
     notelemetry: boolean;
     noreleasecheck: boolean;
     acceptedtos: number;
+    confirmflags: ConfirmFlagsType;
 };
 
 type ReleaseInfoType = {
@@ -524,6 +545,7 @@ type AlertMessageType = {
     message: string;
     confirm?: boolean;
     markdown?: boolean;
+    confirmflag?: string;
 };
 
 type HistorySearchParams = {
@@ -756,4 +778,5 @@ export type {
     ModalStoreEntry,
     StrWithPos,
     CmdInputTextPacketType,
+    OpenAICmdInfoChatMessageType,
 };

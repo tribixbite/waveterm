@@ -17,24 +17,46 @@
 }
 
 .disconnected-modal {
-    .modal-content {
-        footer {
-            .footer-text-link {
-                color: @term-white;
-                cursor: pointer;
+    .wave-modal-content {
+        .wave-modal-body {
+            padding: 0;
+
+            .modal-content {
+                footer {
+                    .footer-text-link {
+                        color: @term-white;
+                        cursor: pointer;
+                    }
+                }
+            }
+
+            .inner-content {
+                .log {
+                    height: 335px;
+                    margin-bottom: 20px;
+                    overflow: auto;
+
+                    &::-webkit-scrollbar-track,
+                    &::-webkit-scrollbar-thumb,
+                    &::-webkit-scrollbar-corner {
+                        display: none;
+                    }
+
+                    &:hover::-webkit-scrollbar-thumb {
+                        display: block;
+                    }
+
+                    pre {
+                        color: @term-white;
+                        background-color: @term-black;
+                    }
+                }
             }
         }
-    }
 
-    .inner-content {
-        .ws-log {
-            padding: 5px;
-            background-color: @term-black;
-            height: 250px;
-            overflow: auto;
-
-            .ws-logline {
-                color: @term-white;
+        .wave-modal-footer {
+            button:first-child {
+                color: @term-green;
             }
         }
     }
@@ -453,6 +475,89 @@
     }
 }
 
+.tabswitcher-modal {
+    width: 452px;
+    min-height: 384px;
+
+    .wave-modal-content {
+        .wave-modal-body {
+            display: flex;
+            padding: 0px;
+            flex-direction: column;
+            align-items: flex-start;
+            align-self: stretch;
+            width: 100%;
+
+            .textfield-wrapper {
+                padding: 20px 20px 0px;
+
+                .wave-input-decoration.start-position {
+                    height: 100%;
+
+                    .tabswitcher-search-prefix {
+                        opacity: 0.5;
+                        font-size: 13px;
+                    }
+                }
+            }
+
+            .list-container {
+                overflow: hidden;
+                padding: 10px 0 20px;
+                width: 100%;
+            }
+
+            .list-container-inner {
+                width: 100%;
+                max-height: 300px;
+                overflow-y: scroll;
+                padding: 0 16px 0 20px;
+
+                &::-webkit-scrollbar-thumb {
+                    display: none;
+                }
+
+                &:hover::-webkit-scrollbar-thumb {
+                    display: block;
+                }
+
+                .options-list {
+                    width: 100%;
+
+                    .search-option {
+                        padding: 5px 5px 5px 8px;
+                        display: flex;
+                        align-items: center;
+                        border: 1px solid transparent;
+                        width: 100%;
+                        overflow: hidden;
+
+                        div.tabname {
+                            flex-grow: 1;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                            padding-right: 5px;
+                        }
+
+                        div.icon {
+                            flex-shrink: 0;
+                            width: 20px;
+                            margin-right: 6px;
+                        }
+                    }
+
+                    .focused-option {
+                        border: 1px solid rgba(241, 246, 243, 0.15);
+                        border-radius: 4px;
+                        background: rgba(255, 255, 255, 0.06);
+                    }
+                }
+            }
+        }
+    }
+}
+
 .screen-settings-tooltip .wave-tooltip-icon {
     i {
         font-size: 13px;
@@ -491,6 +596,10 @@
             gap: 4px;
             align-self: stretch;
             width: 100%;
+
+            .settings-input .hotkey {
+                color: @text-secondary;
+            }
         }
     }
 }
@@ -564,11 +673,15 @@
 }
 
 .alert-modal {
-    width: 500px;
+    width: 510px;
 
     .wave-modal-content {
         .wave-modal-body {
             padding: 40px 20px;
+
+            .dontshowagain-text {
+                margin-top: 15px;
+            }
         }
     }
 }

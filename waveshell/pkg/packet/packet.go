@@ -70,6 +70,8 @@ const PacketEOFStr = "EOF"
 
 var TypeStrToFactory map[string]reflect.Type
 
+const OpenAICmdInfoChatGreetingMessage = "Hello, may I help you with this command? \n(Press ESC to close and Ctrl+L to clear chat buffer)"
+
 func init() {
 	TypeStrToFactory = make(map[string]reflect.Type)
 	TypeStrToFactory[RunPacketStr] = reflect.TypeOf(RunPacketType{})
@@ -729,6 +731,14 @@ type OpenAIUsageType struct {
 	TotalTokens      int `json:"total_tokens,omitempty"`
 }
 
+type OpenAICmdInfoPacketOutputType struct {
+	Model        string `json:"model,omitempty"`
+	Created      int64  `json:"created,omitempty"`
+	FinishReason string `json:"finish_reason,omitempty"`
+	Message      string `json:"message,omitempty"`
+	Error        string `json:"error,omitempty"`
+}
+
 type OpenAIPacketType struct {
 	Type         string           `json:"type"`
 	Model        string           `json:"model,omitempty"`
@@ -843,6 +853,14 @@ func MakeWriteFileDonePacket(reqId string) *WriteFileDonePacketType {
 	}
 }
 
+type OpenAICmdInfoChatMessage struct {
+	MessageID           int                            `json:"messageid"`
+	IsAssistantResponse bool                           `json:"isassistantresponse,omitempty"`
+	AssistantResponse   *OpenAICmdInfoPacketOutputType `json:"assistantresponse,omitempty"`
+	UserQuery           string                         `json:"userquery,omitempty"`
+	UserEngineeredQuery string                         `json:"userengineeredquery,omitempty"`
+}
+
 type OpenAIPromptMessageType struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -927,14 +945,6 @@ func ParseJsonPacket(jsonBuf []byte) (PacketType, error) {
 	return pk, nil
 }
 
-func sanitizeBytes(buf []byte) {
-	for idx, b := range buf {
-		if b >= 127 || (b < 32 && b != 10 && b != 13) {
-			buf[idx] = '?'
-		}
-	}
-}
-
 type SendError struct {
 	IsWriteError   bool // fatal
 	IsMarshalError bool // not fatal
@@ -970,7 +980,6 @@ func MarshalPacket(packet PacketType) ([]byte, error) {
 	outBuf.Write(jsonBytes)
 	outBuf.WriteByte('\n')
 	outBytes := outBuf.Bytes()
-	sanitizeBytes(outBytes)
 	return outBytes, nil
 }
 

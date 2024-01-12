@@ -89,6 +89,7 @@ var ColorNames = []string{"yellow", "blue", "pink", "mint", "cyan", "violet", "o
 var TabIcons = []string{"square", "sparkle", "fire", "ghost", "cloud", "compass", "crown", "droplet", "graduation-cap", "heart", "file"}
 var RemoteColorNames = []string{"red", "green", "yellow", "blue", "magenta", "cyan", "white", "orange"}
 var RemoteSetArgs = []string{"alias", "connectmode", "key", "password", "autoinstall", "color"}
+var ConfirmFlags = []string{"hideshellprompt"}
 
 var ScreenCmds = []string{"run", "comment", "cd", "cr", "clear", "sw", "reset", "signal", "chat"}
 var NoHistCmds = []string{"_compgen", "line", "history", "_killserver"}
@@ -115,8 +116,8 @@ var SetVarScopes = []SetVarScope{
 	{ScopeName: "remote", VarNames: []string{}},
 }
 
-var userHostRe = regexp.MustCompile("^(sudo@)?([a-z][a-z0-9._@-]*)@([a-z0-9][a-z0-9.-]*)(?::([0-9]+))?$")
-var remoteAliasRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_-]*$")
+var userHostRe = regexp.MustCompile(`^(sudo@)?([a-z][a-z0-9._@\\-]*)@([a-z0-9][a-z0-9.-]*)(?::([0-9]+))?$`)
+var remoteAliasRe = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
 var genericNameRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_ .()<>,/\"'\\[\\]{}=+$@!*-]*$")
 var rendererRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.:-]*$")
 var positionRe = regexp.MustCompile("^((S?\\+|E?-)?[0-9]+|(\\+|-|S|E))$")
@@ -213,6 +214,7 @@ func init() {
 	registerCmdFn("client:set", ClientSetCommand)
 	registerCmdFn("client:notifyupdatewriter", ClientNotifyUpdateWriterCommand)
 	registerCmdFn("client:accepttos", ClientAcceptTosCommand)
+	registerCmdFn("client:setconfirmflag", ClientConfirmFlagCommand)
 
 	registerCmdFn("sidebar:open", SidebarOpenCommand)
 	registerCmdFn("sidebar:close", SidebarCloseCommand)
@@ -1255,8 +1257,15 @@ func parseRemoteEditArgs(isNew bool, pk *scpacket.FeCommandPacketType, isLocal b
 		if portVal == 0 && uhPort != 0 {
 			portVal = uhPort
 		}
+		if portVal < 0 || portVal > 65535 {
+			// 0 is used as a sentinel value for the default in this case
+			return nil, fmt.Errorf("invalid port argument, \"%d\" is not in the range of 1 to 65535", portVal)
+		}
 		sshOpts.SSHPort = portVal
 		canonicalName = remoteUser + "@" + remoteHost
+		if portVal != 0 && portVal != 22 {
+			canonicalName = canonicalName + ":" + strconv.Itoa(portVal)
+		}
 		if isSudo {
 			canonicalName = "sudo@" + canonicalName
 		}
@@ -1511,6 +1520,47 @@ type HostInfoType struct {
 	Ignore        bool
 }
 
+func createSshImportSummary(changeList map[string][]string) string {
+	totalNumChanges := len(changeList["create"]) + len(changeList["delete"]) + len(changeList["update"]) + len(changeList["createErr"]) + len(changeList["deleteErr"]) + len(changeList["updateErr"])
+	if totalNumChanges == 0 {
+		return "No changes made from ssh config import"
+	}
+	remoteStatusMsgs := map[string]string{
+		"delete":    "Deleted %d connection%s: %s",
+		"create":    "Created %d connection%s: %s",
+		"update":    "Edited %d connection%s: %s",
+		"deleteErr": "Error deleting %d connection%s: %s",
+		"createErr": "Error creating %d connection%s: %s",
+		"updateErr": "Error editing %d connection%s: %s",
+	}
+
+	changeTypeKeys := []string{"delete", "create", "update", "deleteErr", "createErr", "updateErr"}
+
+	var outMsgs []string
+	for _, changeTypeKey := range changeTypeKeys {
+		changes := changeList[changeTypeKey]
+		if len(changes) > 0 {
+			rawStatusMsg := remoteStatusMsgs[changeTypeKey]
+			var pluralize string
+			if len(changes) == 1 {
+				pluralize = ""
+			} else {
+				pluralize = "s"
+			}
+			newMsg := fmt.Sprintf(rawStatusMsg, len(changes), pluralize, strings.Join(changes, ", "))
+			outMsgs = append(outMsgs, newMsg)
+		}
+	}
+
+	var pluralize string
+	if totalNumChanges == 1 {
+		pluralize = ""
+	} else {
+		pluralize = "s"
+	}
+	return fmt.Sprintf("%d connection%s changed:\n\n%s", totalNumChanges, pluralize, strings.Join(outMsgs, "\n\n"))
+}
+
 func NewHostInfo(hostName string) (*HostInfoType, error) {
 	userName, _ := ssh_config.GetStrict(hostName, "User")
 	if userName == "" {
@@ -1528,18 +1578,18 @@ func NewHostInfo(hostName string) (*HostInfoType, error) {
 
 	portStr, _ := ssh_config.GetStrict(hostName, "Port")
 	var portVal int
-	if portStr != "" {
+	if portStr != "" && portStr != "22" {
+		canonicalName = canonicalName + ":" + portStr
 		var err error
 		portVal, err = strconv.Atoi(portStr)
 		if err != nil {
 			// do not make assumptions about port if incorrectly configured
 			return nil, fmt.Errorf("could not parse \"%s\" (%s) - %s could not be converted to a valid port\n", hostName, canonicalName, portStr)
 		}
-		if int(int16(portVal)) != portVal {
+		if portVal <= 0 || portVal > 65535 {
 			return nil, fmt.Errorf("could not parse port \"%d\": number is not valid for a port\n", portVal)
 		}
 	}
-
 	identityFile, _ := ssh_config.GetStrict(hostName, "IdentityFile")
 	passwordAuth, _ := ssh_config.GetStrict(hostName, "PasswordAuthentication")
 
@@ -1579,6 +1629,7 @@ func RemoteConfigParseCommand(ctx context.Context, pk *scpacket.FeCommandPacketT
 	localConfig := filepath.Join(home, ".ssh", "config")
 	systemConfig := filepath.Join("/", "ssh", "config")
 	sshConfigFiles := []string{localConfig, systemConfig}
+	ssh_config.ReloadConfigs()
 	hostPatterns, hostPatternsErr := resolveSshConfigPatterns(sshConfigFiles)
 	if hostPatternsErr != nil {
 		return nil, hostPatternsErr
@@ -1600,6 +1651,8 @@ func RemoteConfigParseCommand(ctx context.Context, pk *scpacket.FeCommandPacketT
 		hostInfoInConfig[hostInfo.CanonicalName] = hostInfo
 	}
 
+	remoteChangeList := make(map[string][]string)
+
 	// remove all previously imported remotes that
 	// no longer have a canonical pattern in the config files
 	for importedRemoteCanonicalName, importedRemote := range previouslyImportedRemotes {
@@ -1608,17 +1661,17 @@ func RemoteConfigParseCommand(ctx context.Context, pk *scpacket.FeCommandPacketT
 		if !importedRemote.Archived && (hostInfo == nil || hostInfo.Ignore) {
 			err = remote.ArchiveRemote(ctx, importedRemote.RemoteId)
 			if err != nil {
+				remoteChangeList["deleteErr"] = append(remoteChangeList["deleteErr"], importedRemote.RemoteCanonicalName)
 				log.Printf("sshconfig-import: failed to remove remote \"%s\" (%s)\n", importedRemote.RemoteAlias, importedRemote.RemoteCanonicalName)
 			} else {
+				remoteChangeList["delete"] = append(remoteChangeList["delete"], importedRemote.RemoteCanonicalName)
 				log.Printf("sshconfig-import: archived remote \"%s\" (%s)\n", importedRemote.RemoteAlias, importedRemote.RemoteCanonicalName)
 			}
 		}
 	}
 
-	var updatedRemotes []string
 	for _, hostInfo := range parsedHostData {
 		previouslyImportedRemote := previouslyImportedRemotes[hostInfo.CanonicalName]
-		updatedRemotes = append(updatedRemotes, hostInfo.CanonicalName)
 		if hostInfo.Ignore {
 			log.Printf("sshconfig-import: ignore remote[%s] as specified in config file\n", hostInfo.CanonicalName)
 			continue
@@ -1626,27 +1679,31 @@ func RemoteConfigParseCommand(ctx context.Context, pk *scpacket.FeCommandPacketT
 		if previouslyImportedRemote != nil && !previouslyImportedRemote.Archived {
 			// this already existed and was created via import
 			// it needs to be updated instead of created
-
 			editMap := make(map[string]interface{})
 			editMap[sstore.RemoteField_Alias] = hostInfo.Host
 			editMap[sstore.RemoteField_ConnectMode] = hostInfo.ConnectMode
-			// changing port is unique to imports because it lets us avoid conflicts
-			// if the port is changed in the ssh config
-			editMap[sstore.RemoteField_SSHPort] = hostInfo.Port
 			if hostInfo.SshKeyFile != "" {
 				editMap[sstore.RemoteField_SSHKey] = hostInfo.SshKeyFile
 			}
 			msh := remote.GetRemoteById(previouslyImportedRemote.RemoteId)
 			if msh == nil {
+				remoteChangeList["updateErr"] = append(remoteChangeList["updateErr"], hostInfo.CanonicalName)
 				log.Printf("strange, msh for remote %s [%s] not found\n", hostInfo.CanonicalName, previouslyImportedRemote.RemoteId)
 				continue
-			} else {
-				err := msh.UpdateRemote(ctx, editMap)
-				if err != nil {
-					log.Printf("error updating remote[%s]: %v\n", hostInfo.CanonicalName, err)
-					continue
-				}
 			}
+
+			if msh.Remote.ConnectMode == hostInfo.ConnectMode && msh.Remote.SSHOpts.SSHIdentity == hostInfo.SshKeyFile && msh.Remote.RemoteAlias == hostInfo.Host {
+				// silently skip this one. it didn't fail, but no changes were needed
+				continue
+			}
+
+			err := msh.UpdateRemote(ctx, editMap)
+			if err != nil {
+				remoteChangeList["updateErr"] = append(remoteChangeList["updateErr"], hostInfo.CanonicalName)
+				log.Printf("error updating remote[%s]: %v\n", hostInfo.CanonicalName, err)
+				continue
+			}
+			remoteChangeList["update"] = append(remoteChangeList["update"], hostInfo.CanonicalName)
 			log.Printf("sshconfig-import: found previously imported remote with canonical name \"%s\": it has been updated\n", hostInfo.CanonicalName)
 		} else {
 			sshOpts := &sstore.SSHOpts{
@@ -1675,21 +1732,31 @@ func RemoteConfigParseCommand(ctx context.Context, pk *scpacket.FeCommandPacketT
 			}
 			err := remote.AddRemote(ctx, r, false)
 			if err != nil {
+				remoteChangeList["createErr"] = append(remoteChangeList["createErr"], hostInfo.CanonicalName)
 				log.Printf("sshconfig-import: failed to add remote \"%s\" (%s): it is being skipped\n", hostInfo.Host, hostInfo.CanonicalName)
 				continue
 			}
+			remoteChangeList["create"] = append(remoteChangeList["create"], hostInfo.CanonicalName)
 			log.Printf("sshconfig-import: created remote \"%s\" (%s)\n", hostInfo.Host, hostInfo.CanonicalName)
 		}
 	}
 
-	update := &sstore.ModelUpdate{Remotes: remote.GetAllRemoteRuntimeState()}
-	update.Info = &sstore.InfoMsgType{}
-	if len(updatedRemotes) == 0 {
-		update.Info.InfoMsg = "no connections imported from ssh config."
+	outMsg := createSshImportSummary(remoteChangeList)
+	visualEdit := resolveBool(pk.Kwargs["visual"], false)
+	if visualEdit {
+		update := &sstore.ModelUpdate{}
+		update.AlertMessage = &sstore.AlertMessageType{
+			Title:    "SSH Config Import",
+			Message:  outMsg,
+			Markdown: true,
+		}
+		return update, nil
 	} else {
-		update.Info.InfoMsg = fmt.Sprintf("imported %d connection(s) from ssh config file: %s\n", len(updatedRemotes), strings.Join(updatedRemotes, ", "))
+		update := &sstore.ModelUpdate{}
+		update.Info = &sstore.InfoMsgType{}
+		update.Info.InfoMsg = outMsg
+		return update, nil
 	}
-	return update, nil
 }
 
 func ScreenShowAllCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (sstore.UpdatePacket, error) {
@@ -1934,6 +2001,114 @@ func doOpenAICompletion(cmd *sstore.CmdType, opts *sstore.OpenAIOptsType, prompt
 	return
 }
 
+func writePacketToUpdateBus(ctx context.Context, cmd *sstore.CmdType, pk *packet.OpenAICmdInfoChatMessage) {
+	update, err := sstore.UpdateWithAddNewOpenAICmdInfoPacket(ctx, cmd.ScreenId, pk)
+	if err != nil {
+		log.Printf("Open AI Update packet err: %v\n", err)
+	}
+	sstore.MainBus.SendScreenUpdate(cmd.ScreenId, update)
+}
+
+func updateAsstResponseAndWriteToUpdateBus(ctx context.Context, cmd *sstore.CmdType, pk *packet.OpenAICmdInfoChatMessage, messageID int) {
+	update, err := sstore.UpdateWithUpdateOpenAICmdInfoPacket(ctx, cmd.ScreenId, messageID, pk)
+	if err != nil {
+		log.Printf("Open AI Update packet err: %v\n", err)
+	}
+	sstore.MainBus.SendScreenUpdate(cmd.ScreenId, update)
+}
+
+func getCmdInfoEngineeredPrompt(userQuery string, curLineStr string) string {
+	rtn := "You are an expert on the command line terminal. Your task is to help me write a command."
+	if curLineStr != "" {
+		rtn += "My current command is: " + curLineStr
+	}
+	rtn += ". My question is: " + userQuery + "."
+	return rtn
+}
+
+func doOpenAICmdInfoCompletion(cmd *sstore.CmdType, clientId string, opts *sstore.OpenAIOptsType, prompt []packet.OpenAIPromptMessageType, curLineStr string) {
+	var hadError bool
+	log.Println("had error: ", hadError)
+	ctx, cancelFn := context.WithTimeout(context.Background(), OpenAIStreamTimeout)
+	defer cancelFn()
+	defer func() {
+		r := recover()
+		if r != nil {
+			panicMsg := fmt.Sprintf("panic: %v", r)
+			log.Printf("panic in doOpenAICompletion: %s\n", panicMsg)
+			hadError = true
+		}
+	}()
+	var ch chan *packet.OpenAIPacketType
+	var err error
+	if opts.APIToken == "" {
+		var conn *websocket.Conn
+		ch, conn, err = openai.RunCloudCompletionStream(ctx, clientId, opts, prompt)
+		if conn != nil {
+			defer conn.Close()
+		}
+	} else {
+		ch, err = openai.RunCompletionStream(ctx, opts, prompt)
+	}
+	asstOutputPk := &packet.OpenAICmdInfoPacketOutputType{
+		Model:        "",
+		Created:      0,
+		FinishReason: "",
+		Message:      "",
+	}
+	asstOutputMessageID := sstore.ScreenMemGetCmdInfoMessageCount(cmd.ScreenId)
+	asstMessagePk := &packet.OpenAICmdInfoChatMessage{IsAssistantResponse: true, AssistantResponse: asstOutputPk, MessageID: asstOutputMessageID}
+	if err != nil {
+		asstOutputPk.Error = fmt.Sprintf("Error calling OpenAI API: %v", err)
+		writePacketToUpdateBus(ctx, cmd, asstMessagePk)
+		return
+	}
+	writePacketToUpdateBus(ctx, cmd, asstMessagePk)
+	doneWaitingForPackets := false
+	for !doneWaitingForPackets {
+		select {
+		case <-time.After(OpenAIPacketTimeout):
+			// timeout reading from channel
+			hadError = true
+			doneWaitingForPackets = true
+			asstOutputPk.Error = "timeout waiting for server response"
+			updateAsstResponseAndWriteToUpdateBus(ctx, cmd, asstMessagePk, asstOutputMessageID)
+			break
+		case pk, ok := <-ch:
+			if ok {
+				// got a packet
+				if pk.Error != "" {
+					hadError = true
+					asstOutputPk.Error = pk.Error
+				}
+				if pk.Model != "" && pk.Index == 0 {
+					asstOutputPk.Model = pk.Model
+					asstOutputPk.Created = pk.Created
+					asstOutputPk.FinishReason = pk.FinishReason
+					if pk.Text != "" {
+						asstOutputPk.Message += pk.Text
+					}
+				}
+				if pk.Index == 0 {
+					if pk.FinishReason != "" {
+						asstOutputPk.FinishReason = pk.FinishReason
+					}
+					if pk.Text != "" {
+						asstOutputPk.Message += pk.Text
+					}
+				}
+				asstMessagePk.AssistantResponse = asstOutputPk
+				updateAsstResponseAndWriteToUpdateBus(ctx, cmd, asstMessagePk, asstOutputMessageID)
+
+			} else {
+				// channel closed
+				doneWaitingForPackets = true
+				break
+			}
+		}
+	}
+}
+
 func doOpenAIStreamCompletion(cmd *sstore.CmdType, clientId string, opts *sstore.OpenAIOptsType, prompt []packet.OpenAIPromptMessageType) {
 	var outputPos int64
 	var hadError bool
@@ -2019,6 +2194,23 @@ func doOpenAIStreamCompletion(cmd *sstore.CmdType, clientId string, opts *sstore
 	return
 }
 
+func BuildOpenAIPromptArrayWithContext(messages []*packet.OpenAICmdInfoChatMessage) []packet.OpenAIPromptMessageType {
+	rtn := make([]packet.OpenAIPromptMessageType, 0)
+	for _, msg := range messages {
+		content := msg.UserEngineeredQuery
+		if msg.UserEngineeredQuery == "" {
+			content = msg.UserQuery
+		}
+		msgRole := sstore.OpenAIRoleUser
+		if msg.IsAssistantResponse {
+			msgRole = sstore.OpenAIRoleAssistant
+			content = msg.AssistantResponse.Message
+		}
+		rtn = append(rtn, packet.OpenAIPromptMessageType{Role: msgRole, Content: content})
+	}
+	return rtn
+}
+
 func OpenAICommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (sstore.UpdatePacket, error) {
 	ids, err := resolveUiIds(ctx, pk, R_Session|R_Screen)
 	if err != nil {
@@ -2044,9 +2236,6 @@ func OpenAICommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (sstor
 		opts.MaxTokens = openai.DefaultMaxTokens
 	}
 	promptStr := firstArg(pk)
-	if promptStr == "" {
-		return nil, fmt.Errorf("openai error, prompt string is blank")
-	}
 	ptermVal := defaultStr(pk.Kwargs["wterm"], DefaultPTERM)
 	pkTermOpts, err := GetUITermOpts(pk.UIContext.WinSize, ptermVal)
 	if err != nil {
@@ -2057,11 +2246,40 @@ func OpenAICommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (sstor
 	if err != nil {
 		return nil, fmt.Errorf("openai error, cannot make dyn cmd")
 	}
+	if resolveBool(pk.Kwargs["cmdinfo"], false) {
+		if promptStr == "" {
+			// this is requesting an update without wanting an openai query
+			update, err := sstore.UpdateWithCurrentOpenAICmdInfoChat(cmd.ScreenId)
+			if err != nil {
+				return nil, fmt.Errorf("error getting update for CmdInfoChat %v", err)
+			}
+			return update, nil
+		}
+		curLineStr := defaultStr(pk.Kwargs["curline"], "")
+		userQueryPk := &packet.OpenAICmdInfoChatMessage{UserQuery: promptStr, MessageID: sstore.ScreenMemGetCmdInfoMessageCount(cmd.ScreenId)}
+		engineeredQuery := getCmdInfoEngineeredPrompt(promptStr, curLineStr)
+		userQueryPk.UserEngineeredQuery = engineeredQuery
+		writePacketToUpdateBus(ctx, cmd, userQueryPk)
+		prompt := BuildOpenAIPromptArrayWithContext(sstore.ScreenMemGetCmdInfoChat(cmd.ScreenId).Messages)
+		go doOpenAICmdInfoCompletion(cmd, clientData.ClientId, opts, prompt, curLineStr)
+		update := &sstore.ModelUpdate{}
+		return update, nil
+	}
+	prompt := []packet.OpenAIPromptMessageType{{Role: sstore.OpenAIRoleUser, Content: promptStr}}
+	if resolveBool(pk.Kwargs["cmdinfoclear"], false) {
+		update, err := sstore.UpdateWithClearOpenAICmdInfo(cmd.ScreenId)
+		if err != nil {
+			return nil, fmt.Errorf("error clearing CmdInfoChat: %v", err)
+		}
+		return update, nil
+	}
+	if promptStr == "" {
+		return nil, fmt.Errorf("openai error, prompt string is blank")
+	}
 	line, err := sstore.AddOpenAILine(ctx, ids.ScreenId, DefaultUserId, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("cannot add new line: %v", err)
 	}
-	prompt := []packet.OpenAIPromptMessageType{{Role: sstore.OpenAIRoleUser, Content: promptStr}}
 	if resolveBool(pk.Kwargs["stream"], true) {
 		go doOpenAIStreamCompletion(cmd, clientData.ClientId, opts, prompt)
 	} else {
@@ -3441,7 +3659,7 @@ func LineDeleteCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (s
 	}
 	err = sstore.DeleteLinesByIds(ctx, ids.ScreenId, lineIds)
 	if err != nil {
-		return nil, fmt.Errorf("/line:delete error purging lines: %v", err)
+		return nil, fmt.Errorf("/line:delete error deleting lines: %v", err)
 	}
 	update := &sstore.ModelUpdate{}
 	for _, lineId := range lineIds {
@@ -3452,6 +3670,11 @@ func LineDeleteCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (s
 		}
 		update.Lines = append(update.Lines, lineObj)
 	}
+	screen, err := sstore.FixupScreenSelectedLine(ctx, ids.ScreenId)
+	if err != nil {
+		return nil, fmt.Errorf("/line:delete error fixing up screen: %v", err)
+	}
+	update.Screens = []*sstore.ScreenType{screen}
 	return update, nil
 }
 
@@ -4016,6 +4239,57 @@ func ClientAcceptTosCommand(ctx context.Context, pk *scpacket.FeCommandPacketTyp
 	update := &sstore.ModelUpdate{
 		ClientData: clientData,
 	}
+	return update, nil
+}
+
+var confirmKeyRe = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// confirm flags must be all lowercase and only contain letters, numbers, and underscores (and start with letter)
+func ClientConfirmFlagCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (sstore.UpdatePacket, error) {
+	// Check for valid arguments length
+	if len(pk.Args) < 2 {
+		return nil, fmt.Errorf("invalid arguments: expected at least 2, got %d", len(pk.Args))
+	}
+
+	// Extract confirmKey and value from pk.Args
+	confirmKey := pk.Args[0]
+	if !confirmKeyRe.MatchString(confirmKey) {
+		return nil, fmt.Errorf("invalid confirm flag key: %s", confirmKey)
+	}
+	value := resolveBool(pk.Args[1], true)
+	validKey := utilfn.ContainsStr(ConfirmFlags, confirmKey)
+	if !validKey {
+		return nil, fmt.Errorf("invalid confirm flag key: %s", confirmKey)
+	}
+
+	clientData, err := sstore.EnsureClientData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve client data: %v", err)
+	}
+
+	// Initialize ConfirmFlags if it's nil
+	if clientData.ClientOpts.ConfirmFlags == nil {
+		clientData.ClientOpts.ConfirmFlags = make(map[string]bool)
+	}
+
+	// Set the confirm flag
+	clientData.ClientOpts.ConfirmFlags[confirmKey] = value
+
+	err = sstore.SetClientOpts(ctx, clientData.ClientOpts)
+	if err != nil {
+		return nil, fmt.Errorf("error updating client data: %v", err)
+	}
+
+	// Retrieve updated client data
+	clientData, err = sstore.EnsureClientData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve updated client data: %v", err)
+	}
+
+	update := &sstore.ModelUpdate{
+		ClientData: clientData,
+	}
+
 	return update, nil
 }
 

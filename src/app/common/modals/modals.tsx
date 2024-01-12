@@ -23,12 +23,15 @@ import {
     Tooltip,
     Button,
     Status,
+    Checkbox,
 } from "../common";
 import * as util from "../../../util/util";
 import * as textmeasure from "../../../util/textmeasure";
+import * as appconst from "../../appconst";
 import { ClientDataType } from "../../../types/types";
+import { Screen } from "../../../model/model";
+import { ReactComponent as SquareIcon } from "../../assets/icons/tab/square.svg";
 
-import { ReactComponent as WarningIcon } from "../../assets/icons/line/triangle-exclamation.svg";
 import shield from "../../assets/icons/shield_check.svg";
 import help from "../../assets/icons/help_filled.svg";
 import github from "../../assets/icons/github.svg";
@@ -42,9 +45,11 @@ const VERSION = __WAVETERM_VERSION__;
 let BUILD = __WAVETERM_BUILD__;
 
 type OV<V> = mobx.IObservableValue<V>;
+type OArr<V> = mobx.IObservableArray<V>;
 
 const RemotePtyRows = 9;
 const RemotePtyCols = 80;
+const NumOfLines = 50;
 const PasswordUnchangedSentinel = "--unchanged--";
 
 @mobxReact.observer
@@ -67,7 +72,8 @@ class ModalsProvider extends React.Component {
 @mobxReact.observer
 class DisconnectedModal extends React.Component<{}, {}> {
     logRef: any = React.createRef();
-    showLog: mobx.IObservableValue<boolean> = mobx.observable.box(false);
+    logs: mobx.IObservableValue<string> = mobx.observable.box("");
+    logInterval: NodeJS.Timeout = null;
 
     @boundMethod
     restartServer() {
@@ -80,8 +86,16 @@ class DisconnectedModal extends React.Component<{}, {}> {
     }
 
     componentDidMount() {
-        if (this.logRef.current != null) {
-            this.logRef.current.scrollTop = this.logRef.current.scrollHeight;
+        this.fetchLogs();
+
+        this.logInterval = setInterval(() => {
+            this.fetchLogs();
+        }, 5000);
+    }
+
+    componentWillUnmount() {
+        if (this.logInterval) {
+            clearInterval(this.logInterval);
         }
     }
 
@@ -91,58 +105,52 @@ class DisconnectedModal extends React.Component<{}, {}> {
         }
     }
 
-    @boundMethod
-    handleShowLog(): void {
-        mobx.action(() => {
-            this.showLog.set(!this.showLog.get());
-        })();
+    fetchLogs() {
+        GlobalModel.getLastLogs(
+            NumOfLines,
+            mobx.action((logs) => {
+                this.logs.set(logs);
+                if (this.logRef.current != null) {
+                    this.logRef.current.scrollTop = this.logRef.current.scrollHeight;
+                }
+            })
+        );
     }
 
     render() {
-        let model = GlobalModel;
-        let logLine: string = null;
-        let idx: number = 0;
         return (
-            <div className="prompt-modal disconnected-modal modal is-active">
-                <div className="modal-background"></div>
-                <div className="modal-content">
-                    <div className="message-header">
-                        <div className="modal-title">Wave Client Disconnected</div>
-                    </div>
-                    <If condition={this.showLog.get()}>
+            <Modal className="disconnected-modal">
+                <Modal.Header title="Wave Client Disconnected" />
+                <div className="wave-modal-body">
+                    <div className="modal-content">
                         <div className="inner-content">
-                            <div className="ws-log" ref={this.logRef}>
-                                <For each="logLine" index="idx" of={GlobalModel.ws.wsLog}>
-                                    <div key={idx} className="ws-logline">
-                                        {logLine}
-                                    </div>
-                                </For>
+                            <div className="log" ref={this.logRef}>
+                                <pre>{this.logs.get()}</pre>
                             </div>
                         </div>
-                    </If>
-                    <footer>
-                        <div className="footer-text-link" style={{ marginLeft: 10 }} onClick={this.handleShowLog}>
-                            <If condition={!this.showLog.get()}>
-                                <i className="fa-sharp fa-solid fa-plus" /> Show Log
-                            </If>
-                            <If condition={this.showLog.get()}>
-                                <i className="fa-sharp fa-solid fa-minus" /> Hide Log
-                            </If>
-                        </div>
-                        <div className="flex-spacer" />
-                        <button onClick={this.tryReconnect} className="button">
+                    </div>
+                </div>
+                <div className="wave-modal-footer">
+                    <Button
+                        theme="secondary"
+                        onClick={this.tryReconnect}
+                        leftIcon={
                             <span className="icon">
                                 <i className="fa-sharp fa-solid fa-rotate" />
                             </span>
-                            <span>Try Reconnect</span>
-                        </button>
-                        <button onClick={this.restartServer} className="button is-danger" style={{ marginLeft: 10 }}>
-                            <WarningIcon className="icon" />
-                            <span>Restart Server</span>
-                        </button>
-                    </footer>
+                        }
+                    >
+                        Try Reconnect
+                    </Button>
+                    <Button
+                        theme="secondary"
+                        onClick={this.restartServer}
+                        leftIcon={<i className="fa-sharp fa-solid fa-triangle-exclamation"></i>}
+                    >
+                        Restart Server
+                    </Button>
                 </div>
-            </div>
+            </Modal>
         );
     }
 }
@@ -210,6 +218,15 @@ class AlertModal extends React.Component<{}, {}> {
         GlobalModel.confirmAlert();
     }
 
+    @boundMethod
+    handleDontShowAgain(checked: boolean) {
+        let message = GlobalModel.alertMessage.get();
+        if (message.confirmflag == null) {
+            return;
+        }
+        GlobalCommandRunner.clientSetConfirmFlag(message.confirmflag, checked);
+    }
+
     render() {
         let message = GlobalModel.alertMessage.get();
         let title = message?.title ?? (message?.confirm ? "Confirm" : "Alert");
@@ -223,16 +240,27 @@ class AlertModal extends React.Component<{}, {}> {
                         <Markdown text={message?.message ?? ""} />
                     </If>
                     <If condition={!message?.markdown}>{message?.message}</If>
+                    <If condition={message.confirmflag}>
+                        <Checkbox
+                            onChange={this.handleDontShowAgain}
+                            label={"Don't show me this again"}
+                            className="dontshowagain-text"
+                        />
+                    </If>
                 </div>
                 <div className="wave-modal-footer">
                     <If condition={isConfirm}>
                         <Button theme="secondary" onClick={this.closeModal}>
                             Cancel
                         </Button>
-                        <Button onClick={this.handleOK}>Ok</Button>
+                        <Button autoFocus={true} onClick={this.handleOK}>
+                            Ok
+                        </Button>
                     </If>
                     <If condition={!isConfirm}>
-                        <Button onClick={this.handleOK}>Ok</Button>
+                        <Button autoFocus={true} onClick={this.handleOK}>
+                            Ok
+                        </Button>
                     </If>
                 </div>
             </Modal>
@@ -497,6 +525,10 @@ class CreateRemoteConnModal extends React.Component<{}, {}> {
         this.errorStr = mobx.observable.box(this.remoteEdit?.errorstr ?? null, { name: "CreateRemote-errorStr" });
     }
 
+    componentDidMount(): void {
+        GlobalModel.getClientData();
+    }
+
     remoteCName(): string {
         let hostName = this.tempHostName.get();
         if (hostName == "") {
@@ -513,6 +545,27 @@ class CreateRemoteConnModal extends React.Component<{}, {}> {
             return this.errorStr.get();
         }
         return this.remoteEdit?.errorstr ?? null;
+    }
+
+    @boundMethod
+    handleOk(): void {
+        this.showShellPrompt(this.submitRemote);
+    }
+
+    @boundMethod
+    showShellPrompt(cb: () => void): void {
+        let prtn = GlobalModel.showAlert({
+            message:
+                "You are about to install WaveShell on a remote machine. Please be aware that WaveShell will be executed on the remote system.",
+            confirm: true,
+            confirmflag: appconst.ConfirmKey_HideShellPrompt,
+        });
+        prtn.then((confirm) => {
+            if (!confirm) {
+                return;
+            }
+            cb();
+        });
     }
 
     @boundMethod
@@ -552,26 +605,27 @@ class CreateRemoteConnModal extends React.Component<{}, {}> {
         kwargs["connectmode"] = this.tempConnectMode.get();
         kwargs["visual"] = "1";
         kwargs["submit"] = "1";
-        let model = this.model;
         let prtn = GlobalCommandRunner.createRemote(cname, kwargs, false);
         prtn.then((crtn) => {
             if (crtn.success) {
+                this.model.setRecentConnAdded(true);
+                this.model.closeModal();
+
                 let crRtn = GlobalCommandRunner.screenSetRemote(cname, true, false);
                 crRtn.then((crcrtn) => {
                     if (crcrtn.success) {
                         return;
                     }
                     mobx.action(() => {
-                        this.errorStr.set(crcrtn.error ?? null);
+                        this.errorStr.set(crcrtn.error);
                     })();
                 });
                 return;
             }
             mobx.action(() => {
-                this.errorStr.set(crtn.error ?? null);
+                this.errorStr.set(crtn.error);
             })();
         });
-        model.seRecentConnAdded(true);
     }
 
     @boundMethod
@@ -789,7 +843,7 @@ class CreateRemoteConnModal extends React.Component<{}, {}> {
                         <div className="settings-field settings-error">Error: {this.getErrorStr()}</div>
                     </If>
                 </div>
-                <Modal.Footer onCancel={this.model.closeModal} onOk={this.submitRemote} okLabel="Connect" />
+                <Modal.Footer onCancel={this.model.closeModal} onOk={this.handleOk} okLabel="Connect" />
             </Modal>
         );
     }
@@ -806,7 +860,7 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
     }
 
     @mobx.computed
-    get selectedRemote(): T.RemoteType {
+    getSelectedRemote(): T.RemoteType {
         const selectedRemoteId = this.model.selectedRemoteId.get();
         return GlobalModel.getRemote(selectedRemoteId);
     }
@@ -821,7 +875,7 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
     }
 
     componentDidUpdate() {
-        if (this.selectedRemote == null || this.selectedRemote.archived) {
+        if (this.getSelectedRemote() == null || this.getSelectedRemote().archived) {
             this.model.deSelectRemote();
         }
     }
@@ -885,7 +939,7 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
 
     @boundMethod
     clickArchive(): void {
-        if (this.selectedRemote && this.selectedRemote.status == "connected") {
+        if (this.getSelectedRemote() && this.getSelectedRemote().status == "connected") {
             GlobalModel.showAlert({ message: "Cannot delete when connected.  Disconnect and try again." });
             return;
         }
@@ -897,21 +951,22 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
             if (!confirm) {
                 return;
             }
-            if (this.selectedRemote) {
-                GlobalCommandRunner.archiveRemote(this.selectedRemote.remoteid);
+            if (this.getSelectedRemote()) {
+                GlobalCommandRunner.archiveRemote(this.getSelectedRemote().remoteid);
             }
+            GlobalModel.modalsModel.popModal();
         });
     }
 
     @boundMethod
     clickReinstall(): void {
-        GlobalCommandRunner.installRemote(this.selectedRemote?.remoteid);
+        GlobalCommandRunner.installRemote(this.getSelectedRemote().remoteid);
     }
 
     @boundMethod
     handleClose(): void {
         this.model.closeModal();
-        this.model.seRecentConnAdded(false);
+        this.model.setRecentConnAdded(false);
     }
 
     renderInstallStatus(remote: T.RemoteType): any {
@@ -990,7 +1045,7 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
                 <Button theme="secondary" disabled={true}>
                     Edit
                     <Tooltip
-                        message={`Remotes imported from an ssh config file cannot be edited inside waveterm. To edit these, you must edit the config file and import it again.`}
+                        message={`Connections imported from an ssh config file cannot be edited inside waveterm. To edit these, you must edit the config file and import it again.`}
                         icon={<i className="fa-sharp fa-regular fa-fw fa-ban" />}
                     >
                         <i className="fa-sharp fa-regular fa-fw fa-ban" />
@@ -1003,7 +1058,7 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
                     <Tooltip
                         message={
                             <span>
-                                Remotes imported from an ssh config file can be deleted, but will come back upon
+                                Connections imported from an ssh config file can be deleted, but will come back upon
                                 importing again. They will stay removed if you follow{" "}
                                 <a href="https://docs.waveterm.dev/features/sshconfig-imports">this procedure</a>.
                             </span>
@@ -1072,7 +1127,7 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
     }
 
     render() {
-        let remote = this.selectedRemote;
+        let remote = this.getSelectedRemote();
 
         if (remote == null) {
             return null;
@@ -1083,14 +1138,15 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
         let termFontSize = GlobalModel.termFontSize.get();
         let termWidth = textmeasure.termWidthFromCols(RemotePtyCols, termFontSize);
         let remoteAliasText = util.isBlank(remote.remotealias) ? "(none)" : remote.remotealias;
+        let selectedRemoteStatus = this.getSelectedRemote().status;
 
         return (
             <Modal className="rconndetail-modal">
-                <Modal.Header title="Connection" onClose={this.model.closeModal} />
+                <Modal.Header title="Connection" onClose={this.handleClose} />
                 <div className="wave-modal-body">
                     <div className="name-header-actions-wrapper">
                         <div className="name text-primary name-wrapper">
-                            {getName(remote)}&nbsp; {getImportTooltip(remote)}
+                            {util.getRemoteName(remote)}&nbsp; {getImportTooltip(remote)}
                         </div>
                         <div className="header-actions">{this.renderHeaderBtns(remote)}</div>
                     </div>
@@ -1161,7 +1217,18 @@ class ViewRemoteConnDetailModal extends React.Component<{}, {}> {
                         </div>
                     </div>
                 </div>
-                <Modal.Footer onOk={this.model.closeModal} onCancel={this.model.closeModal} okLabel="Done" />
+                <div className="wave-modal-footer">
+                    <Button
+                        theme="secondary"
+                        disabled={selectedRemoteStatus == "connecting"}
+                        onClick={this.handleClose}
+                    >
+                        Cancel
+                    </Button>
+                    <Button disabled={selectedRemoteStatus == "connecting"} onClick={this.handleClose}>
+                        Done
+                    </Button>
+                </div>
             </Modal>
         );
     }
@@ -1343,7 +1410,7 @@ class EditRemoteConnModal extends React.Component<{}, {}> {
                 <Modal.Header title="Edit Connection" onClose={this.model.closeModal} />
                 <div className="wave-modal-body">
                     <div className="name-actions-section">
-                        <div className="name text-primary">{getName(this.selectedRemote)}</div>
+                        <div className="name text-primary">{util.getRemoteName(this.selectedRemote)}</div>
                     </div>
                     <div className="alias-section">
                         <TextField
@@ -1459,13 +1526,308 @@ class EditRemoteConnModal extends React.Component<{}, {}> {
     }
 }
 
-const getName = (remote: T.RemoteType): string => {
-    if (remote == null) {
-        return "";
-    }
-    const { remotealias, remotecanonicalname } = remote;
-    return remotealias ? `${remotealias} [${remotecanonicalname}]` : remotecanonicalname;
+type SwitcherDataType = {
+    sessionId: string;
+    sessionName: string;
+    sessionIdx: number;
+    screenId: string;
+    screenIdx: number;
+    screenName: string;
+    icon: string;
+    color: string;
 };
+
+const MaxOptionsToDisplay = 100;
+
+@mobxReact.observer
+class TabSwitcherModal extends React.Component<{}, {}> {
+    screens: Map<string, OV<string>>[];
+    sessions: Map<string, OV<string>>[];
+    options: SwitcherDataType[] = [];
+    sOptions: OArr<SwitcherDataType> = mobx.observable.array(null, {
+        name: "TabSwitcherModal-sOptions",
+    });
+    focusedIdx: OV<number> = mobx.observable.box(0, { name: "TabSwitcherModal-selectedIdx" });
+    activeSessionIdx: number;
+    optionRefs = [];
+    listWrapperRef = React.createRef<HTMLDivElement>();
+    prevFocusedIdx = 0;
+
+    componentDidMount() {
+        this.activeSessionIdx = GlobalModel.getActiveSession().sessionIdx.get();
+        let oSessions = GlobalModel.sessionList;
+        let oScreens = GlobalModel.screenMap;
+        oScreens.forEach((oScreen) => {
+            // Find the matching session in the observable array
+            let foundSession = oSessions.find((s) => {
+                if (s.sessionId === oScreen.sessionId && s.archived.get() == false) {
+                    return true;
+                }
+                return false;
+            });
+
+            if (foundSession) {
+                let data: SwitcherDataType = {
+                    sessionName: foundSession.name.get(),
+                    sessionId: foundSession.sessionId,
+                    sessionIdx: foundSession.sessionIdx.get(),
+                    screenName: oScreen.name.get(),
+                    screenId: oScreen.screenId,
+                    screenIdx: oScreen.screenIdx.get(),
+                    icon: this.getTabIcon(oScreen),
+                    color: this.getTabColor(oScreen),
+                };
+                this.options.push(data);
+            }
+        });
+
+        mobx.action(() => {
+            this.sOptions.replace(this.sortOptions(this.options).slice(0, MaxOptionsToDisplay));
+        })();
+
+        document.addEventListener("keydown", this.handleKeyDown);
+    }
+
+    componentWillUnmount() {
+        document.removeEventListener("keydown", this.handleKeyDown);
+    }
+
+    componentDidUpdate() {
+        let currFocusedIdx = this.focusedIdx.get();
+
+        // Check if selectedIdx has changed
+        if (currFocusedIdx !== this.prevFocusedIdx) {
+            let optionElement = this.optionRefs[currFocusedIdx]?.current;
+
+            if (optionElement) {
+                optionElement.scrollIntoView({ block: "nearest" });
+            }
+
+            // Update prevFocusedIdx for the next update cycle
+            this.prevFocusedIdx = currFocusedIdx;
+        }
+        if (currFocusedIdx >= this.sOptions.length && this.sOptions.length > 0) {
+            this.setFocusedIndex(this.sOptions.length - 1);
+        }
+    }
+
+    @boundMethod
+    getTabIcon(screen: Screen): string {
+        let tabIcon = "default";
+        let screenOpts = screen.opts.get();
+        if (screenOpts != null && !util.isBlank(screenOpts.tabicon)) {
+            tabIcon = screenOpts.tabicon;
+        }
+        return tabIcon;
+    }
+
+    @boundMethod
+    getTabColor(screen: Screen): string {
+        let tabColor = "default";
+        let screenOpts = screen.opts.get();
+        if (screenOpts != null && !util.isBlank(screenOpts.tabcolor)) {
+            tabColor = screenOpts.tabcolor;
+        }
+        return tabColor;
+    }
+
+    @boundMethod
+    handleKeyDown(e) {
+        if (e.key === "Escape") {
+            this.closeModal();
+        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            let newIndex = this.calculateNewIndex(e.key === "ArrowUp");
+            this.setFocusedIndex(newIndex);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            this.handleSelect(this.focusedIdx.get());
+        }
+    }
+
+    @boundMethod
+    calculateNewIndex(isUpKey) {
+        let currentIndex = this.focusedIdx.get();
+        if (isUpKey) {
+            return Math.max(currentIndex - 1, 0);
+        } else {
+            return Math.min(currentIndex + 1, this.sOptions.length - 1);
+        }
+    }
+
+    @boundMethod
+    setFocusedIndex(index) {
+        mobx.action(() => {
+            this.focusedIdx.set(index);
+        })();
+    }
+
+    @boundMethod
+    closeModal(): void {
+        GlobalModel.modalsModel.popModal();
+    }
+
+    @boundMethod
+    handleSelect(index: number): void {
+        const selectedOption = this.sOptions[index];
+        if (selectedOption) {
+            GlobalCommandRunner.switchScreen(selectedOption.screenId, selectedOption.sessionId);
+            this.closeModal();
+        }
+    }
+
+    @boundMethod
+    handleSearch(val: string): void {
+        let sOptions: SwitcherDataType[];
+        if (val == "") {
+            sOptions = this.sortOptions(this.options).slice(0, MaxOptionsToDisplay);
+        } else {
+            sOptions = this.filterOptions(val);
+            sOptions = this.sortOptions(sOptions);
+            if (sOptions.length > MaxOptionsToDisplay) {
+                sOptions = sOptions.slice(0, MaxOptionsToDisplay);
+            }
+        }
+        mobx.action(() => {
+            this.sOptions.replace(sOptions);
+            this.focusedIdx.set(0);
+        })();
+    }
+
+    @mobx.computed
+    @boundMethod
+    filterOptions(searchInput: string): SwitcherDataType[] {
+        let filteredScreens = [];
+
+        for (let i = 0; i < this.options.length; i++) {
+            let tab = this.options[i];
+            let match = false;
+
+            if (searchInput.includes("/")) {
+                let [sessionFilter, screenFilter] = searchInput.split("/").map((s) => s.trim().toLowerCase());
+                match =
+                    tab.sessionName.toLowerCase().includes(sessionFilter) &&
+                    tab.screenName.toLowerCase().includes(screenFilter);
+            } else {
+                match =
+                    tab.sessionName.toLowerCase().includes(searchInput) ||
+                    tab.screenName.toLowerCase().includes(searchInput);
+            }
+
+            // Add tab to filtered list if it matches the criteria
+            if (match) {
+                filteredScreens.push(tab);
+            }
+        }
+
+        return filteredScreens;
+    }
+
+    @mobx.computed
+    @boundMethod
+    sortOptions(options: SwitcherDataType[]): SwitcherDataType[] {
+        return options.sort((a, b) => {
+            let aInCurrentSession = a.sessionIdx === this.activeSessionIdx;
+            let bInCurrentSession = b.sessionIdx === this.activeSessionIdx;
+
+            // Tabs in the current session are sorted by screenIdx
+            if (aInCurrentSession && bInCurrentSession) {
+                return a.screenIdx - b.screenIdx;
+            }
+            // a is in the current session and b is not, so a comes first
+            else if (aInCurrentSession) {
+                return -1;
+            }
+            // b is in the current session and a is not, so b comes first
+            else if (bInCurrentSession) {
+                return 1;
+            }
+            // Both are in different, non-current sessions - sort by sessionIdx and then by screenIdx
+            else {
+                if (a.sessionIdx === b.sessionIdx) {
+                    return a.screenIdx - b.screenIdx;
+                } else {
+                    return a.sessionIdx - b.sessionIdx;
+                }
+            }
+        });
+    }
+
+    @boundMethod
+    renderIcon(option: SwitcherDataType): React.ReactNode {
+        let tabIcon = option.icon;
+        if (tabIcon === "default" || tabIcon === "square") {
+            return <SquareIcon className="left-icon" />;
+        }
+        return <i className={`fa-sharp fa-solid fa-${tabIcon}`}></i>;
+    }
+
+    @boundMethod
+    renderOption(option: SwitcherDataType, index: number): JSX.Element {
+        if (!this.optionRefs[index]) {
+            this.optionRefs[index] = React.createRef();
+        }
+        return (
+            <div
+                key={option.sessionId + "/" + option.screenId}
+                ref={this.optionRefs[index]}
+                className={cn("search-option unselectable", {
+                    "focused-option": this.focusedIdx.get() === index,
+                })}
+                onClick={() => this.handleSelect(index)}
+            >
+                <div className={cn("icon", "color-" + option.color)}>{this.renderIcon(option)}</div>
+                <div className="tabname">
+                    #{option.sessionName} / {option.screenName}
+                </div>
+            </div>
+        );
+    }
+
+    render() {
+        let option: SwitcherDataType;
+        let index: number;
+        return (
+            <Modal className="tabswitcher-modal">
+                <div className="wave-modal-body">
+                    <div className="textfield-wrapper">
+                        <TextField
+                            onChange={this.handleSearch}
+                            maxLength={400}
+                            autoFocus={true}
+                            decoration={{
+                                startDecoration: (
+                                    <InputDecoration position="start">
+                                        <div className="tabswitcher-search-prefix">Switch to Tab:</div>
+                                    </InputDecoration>
+                                ),
+                                endDecoration: (
+                                    <InputDecoration>
+                                        <Tooltip
+                                            message={`Type to filter workspaces and tabs.`}
+                                            icon={<i className="fa-sharp fa-regular fa-circle-question" />}
+                                        >
+                                            <i className="fa-sharp fa-regular fa-circle-question" />
+                                        </Tooltip>
+                                    </InputDecoration>
+                                ),
+                            }}
+                        />
+                    </div>
+                    <div className="list-container">
+                        <div ref={this.listWrapperRef} className="list-container-inner">
+                            <div className="options-list">
+                                <For each="option" index="index" of={this.sOptions}>
+                                    {this.renderOption(option, index)}
+                                </For>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+        );
+    }
+}
 
 const getImportTooltip = (remote: T.RemoteType): React.ReactElement<any, any> => {
     if (remote.sshconfigsrc == "sshconfig-import") {
@@ -1493,4 +1855,5 @@ export {
     ViewRemoteConnDetailModal,
     EditRemoteConnModal,
     ModalsProvider,
+    TabSwitcherModal,
 };

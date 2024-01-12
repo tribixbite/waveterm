@@ -16,14 +16,9 @@ import { PluginsView } from "./pluginsview/pluginsview";
 import { BookmarksView } from "./bookmarks/bookmarks";
 import { HistoryView } from "./history/history";
 import { ConnectionsView } from "./connections/connections";
-import {
-    ScreenSettingsModal,
-    SessionSettingsModal,
-    LineSettingsModal,
-    ClientSettingsModal,
-} from "./common/modals/settings";
 import { MainSideBar } from "./sidebar/sidebar";
-import { DisconnectedModal, ClientStopModal, ModalsProvider } from "./common/modals/modals";
+import { DisconnectedModal, ClientStopModal } from "./common/modals";
+import { ModalsProvider } from "./common/modals/provider";
 import { ErrorBoundary } from "./common/error/errorboundary";
 import "./app.less";
 
@@ -74,7 +69,6 @@ class App extends React.Component<{}, {}> {
     }
 
     render() {
-        let clientSettingsModal = GlobalModel.clientSettingsModal.get();
         let remotesModel = GlobalModel.remotesModel;
         let disconnected = !GlobalModel.ws.open.get() || !GlobalModel.waveSrvRunning.get();
         let hasClientStop = GlobalModel.getHasClientStop();

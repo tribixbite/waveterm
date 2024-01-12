@@ -11,6 +11,7 @@ import cn from "classnames";
 import { If } from "tsx-control-statements/components";
 import type { RemoteType } from "../../types/types";
 import ReactDOM from "react-dom";
+import { GlobalModel } from "../../model/model";
 
 import { ReactComponent as CheckIcon } from "../assets/icons/line/check.svg";
 import { ReactComponent as CopyIcon } from "../assets/icons/history/copy.svg";
@@ -99,23 +100,57 @@ class Toggle extends React.Component<{ checked: boolean; onChange: (value: boole
 }
 
 class Checkbox extends React.Component<
-    { checked: boolean; onChange: (value: boolean) => void; label: React.ReactNode; id: string },
-    {}
+    {
+        checked?: boolean;
+        defaultChecked?: boolean;
+        onChange: (value: boolean) => void;
+        label: React.ReactNode;
+        className?: string;
+        id?: string;
+    },
+    { checkedInternal: boolean }
 > {
+    generatedId;
+    static idCounter = 0;
+
+    constructor(props) {
+        super(props);
+        this.state = {
+            checkedInternal: this.props.checked !== undefined ? this.props.checked : Boolean(this.props.defaultChecked),
+        };
+        this.generatedId = `checkbox-${Checkbox.idCounter++}`;
+    }
+
+    componentDidUpdate(prevProps) {
+        if (this.props.checked !== undefined && this.props.checked !== prevProps.checked) {
+            this.setState({ checkedInternal: this.props.checked });
+        }
+    }
+
+    handleChange = (e) => {
+        const newChecked = e.target.checked;
+        if (this.props.checked === undefined) {
+            this.setState({ checkedInternal: newChecked });
+        }
+        this.props.onChange(newChecked);
+    };
+
     render() {
-        const { checked, onChange, label, id } = this.props;
+        const { label, className, id } = this.props;
+        const { checkedInternal } = this.state;
+        const checkboxId = id || this.generatedId;
 
         return (
-            <div className="checkbox">
+            <div className={cn("checkbox", className)}>
                 <input
                     type="checkbox"
-                    id={id}
-                    checked={checked}
-                    onChange={(e) => onChange(e.target.checked)}
-                    aria-checked={checked}
+                    id={checkboxId}
+                    checked={checkedInternal}
+                    onChange={this.handleChange}
+                    aria-checked={checkedInternal}
                     role="checkbox"
                 />
-                <label htmlFor={id}>
+                <label htmlFor={checkboxId}>
                     <span></span>
                     {label}
                 </label>
@@ -231,6 +266,8 @@ interface ButtonProps {
     rightIcon?: React.ReactNode;
     color?: string;
     style?: React.CSSProperties;
+    autoFocus?: boolean;
+    className?: string;
 }
 
 class Button extends React.Component<ButtonProps> {
@@ -257,6 +294,7 @@ class Button extends React.Component<ButtonProps> {
                 onClick={this.handleClick}
                 disabled={disabled}
                 style={style}
+                autoFocus={this.props.autoFocus}
             >
                 {leftIcon && <span className="icon-left">{leftIcon}</span>}
                 {children}
@@ -283,25 +321,24 @@ export default IconButton;
 
 interface LinkButtonProps extends ButtonProps {
     href: string;
+    rel?: string;
     target?: string;
 }
 
-class LinkButton extends IconButton {
+class LinkButton extends React.Component<LinkButtonProps> {
     render() {
-        // @ts-ignore
-        const { href, target, leftIcon, rightIcon, children, theme, variant }: LinkButtonProps = this.props;
+        const { leftIcon, rightIcon, children, className, ...rest } = this.props;
 
         return (
-            <a href={href} target={target} className={`wave-button link-button`}>
-                <button {...this.props} className={`icon-button ${theme} ${variant}`}>
-                    {leftIcon && <span className="icon-left">{leftIcon}</span>}
-                    {children}
-                    {rightIcon && <span className="icon-right">{rightIcon}</span>}
-                </button>
+            <a {...rest} className={cn(`wave-button link-button`, className)}>
+                {leftIcon && <span className="icon-left">{leftIcon}</span>}
+                {children}
+                {rightIcon && <span className="icon-right">{rightIcon}</span>}
             </a>
         );
     }
 }
+
 interface StatusProps {
     status: "green" | "red" | "gray" | "yellow";
     text: string;
@@ -332,7 +369,7 @@ interface TextFieldDecorationProps {
     endDecoration?: React.ReactNode;
 }
 interface TextFieldProps {
-    label: string;
+    label?: string;
     value?: string;
     className?: string;
     onChange?: (value: string) => void;
@@ -445,10 +482,11 @@ class TextField extends React.Component<TextFieldProps, TextFieldState> {
 
         return (
             <div
-                className={cn(`wave-textfield ${className || ""}`, {
+                className={cn("wave-textfield", className, {
                     focused: focused,
                     error: error,
                     disabled: disabled,
+                    "no-label": !label,
                 })}
                 onFocus={this.handleComponentFocus}
                 onBlur={this.handleComponentBlur}
@@ -456,15 +494,17 @@ class TextField extends React.Component<TextFieldProps, TextFieldState> {
             >
                 {decoration?.startDecoration && <>{decoration.startDecoration}</>}
                 <div className="wave-textfield-inner">
-                    <label
-                        className={cn("wave-textfield-inner-label", {
-                            float: this.state.hasContent || this.state.focused || placeholder,
-                            "offset-left": decoration?.startDecoration,
-                        })}
-                        htmlFor={label}
-                    >
-                        {label}
-                    </label>
+                    <If condition={label}>
+                        <label
+                            className={cn("wave-textfield-inner-label", {
+                                float: this.state.hasContent || this.state.focused || placeholder,
+                                "offset-left": decoration?.startDecoration,
+                            })}
+                            htmlFor={label}
+                        >
+                            {label}
+                        </label>
+                    </If>
                     <input
                         className={cn("wave-textfield-inner-input", { "offset-left": decoration?.startDecoration })}
                         ref={this.inputRef}
@@ -774,7 +814,7 @@ class InfoMessage extends React.Component<{ width: number; children: React.React
 function LinkRenderer(props: any): any {
     let newUrl = "https://extern?" + encodeURIComponent(props.href);
     return (
-        <a href={newUrl} target="_blank"  rel={"noopener"}>
+        <a href={newUrl} target="_blank" rel={"noopener"}>
             {props.children}
         </a>
     );
@@ -789,9 +829,67 @@ function CodeRenderer(props: any): any {
 }
 
 @mobxReact.observer
-class Markdown extends React.Component<{ text: string; style?: any; extraClassName?: string }, {}> {
+class CodeBlockMarkdown extends React.Component<
+    { children: React.ReactNode; blockText: string; codeSelectSelectedIndex?: number },
+    {}
+> {
+    blockIndex: number;
+    blockRef: React.RefObject<HTMLPreElement>;
+
+    constructor(props) {
+        super(props);
+        this.blockRef = React.createRef();
+        this.blockIndex = GlobalModel.inputModel.addCodeBlockToCodeSelect(this.blockRef);
+    }
+
+    render() {
+        let codeText = this.props.blockText;
+        let clickHandler: (e: React.MouseEvent<HTMLElement>, blockIndex: number) => void;
+        let inputModel = GlobalModel.inputModel;
+        clickHandler = (e: React.MouseEvent<HTMLElement>, blockIndex: number) => {
+            inputModel.setCodeSelectSelectedCodeBlock(blockIndex);
+        };
+        let selected = this.blockIndex == this.props.codeSelectSelectedIndex;
+        return (
+            <pre
+                ref={this.blockRef}
+                className={cn({ selected: selected })}
+                onClick={(event) => clickHandler(event, this.blockIndex)}
+            >
+                {this.props.children}
+            </pre>
+        );
+    }
+}
+
+@mobxReact.observer
+class Markdown extends React.Component<
+    { text: string; style?: any; extraClassName?: string; codeSelect?: boolean },
+    {}
+> {
+    CodeBlockRenderer(props: any, codeSelect: boolean, codeSelectIndex: number): any {
+        let codeText = codeSelect ? props.node.children[0].children[0].value : props.children;
+        if (codeText) {
+            codeText = codeText.replace(/\n$/, ""); // remove trailing newline
+        }
+        if (codeSelect) {
+            return (
+                <CodeBlockMarkdown blockText={codeText} codeSelectSelectedIndex={codeSelectIndex}>
+                    {props.children}
+                </CodeBlockMarkdown>
+            );
+        } else {
+            let clickHandler = (e: React.MouseEvent<HTMLElement>) => {
+                navigator.clipboard.writeText(codeText);
+            };
+            return <pre onClick={(event) => clickHandler(event)}>{props.children}</pre>;
+        }
+    }
+
     render() {
         let text = this.props.text;
+        let codeSelect = this.props.codeSelect;
+        let curCodeSelectIndex = GlobalModel.inputModel.getCodeSelectSelectedIndex();
         let markdownComponents = {
             a: LinkRenderer,
             h1: (props) => HeaderRenderer(props, 1),
@@ -800,7 +898,8 @@ class Markdown extends React.Component<{ text: string; style?: any; extraClassNa
             h4: (props) => HeaderRenderer(props, 4),
             h5: (props) => HeaderRenderer(props, 5),
             h6: (props) => HeaderRenderer(props, 6),
-            code: CodeRenderer,
+            code: (props) => CodeRenderer(props),
+            pre: (props) => this.CodeBlockRenderer(props, codeSelect, curCodeSelectIndex),
         };
         return (
             <div className={cn("markdown content", this.props.extraClassName)} style={this.props.style}>
@@ -1082,16 +1181,18 @@ class Dropdown extends React.Component<DropdownProps, DropdownState> {
 }
 
 interface ModalHeaderProps {
-    onClose: () => void;
+    onClose?: () => void;
     title: string;
 }
 
 const ModalHeader: React.FC<ModalHeaderProps> = ({ onClose, title }) => (
     <div className="wave-modal-header">
         {<div className="wave-modal-title">{title}</div>}
-        <IconButton theme="secondary" variant="ghost" onClick={onClose}>
-            <i className="fa-sharp fa-solid fa-xmark"></i>
-        </IconButton>
+        <If condition={onClose}>
+            <IconButton theme="secondary" variant="ghost" onClick={onClose}>
+                <i className="fa-sharp fa-solid fa-xmark"></i>
+            </IconButton>
+        </If>
     </div>
 );
 
@@ -1141,7 +1242,7 @@ class Modal extends React.Component<ModalProps> {
     }
 
     render() {
-        return ReactDOM.createPortal(this.renderModal(), document.getElementById("app") );
+        return ReactDOM.createPortal(this.renderModal(), document.getElementById("app"));
     }
 }
 
