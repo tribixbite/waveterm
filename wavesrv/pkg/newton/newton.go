@@ -129,38 +129,40 @@ func GetSuggestions(cmdStr utilfn.StrWithPos) error {
 		return nil
 	}
 
-	cmd, args, err := parseCommand(cmdStr.Str)
-	if err != nil {
-		return fmt.Errorf("error parsing command: %w", err)
-	}
+	// cmd, args, err := parseCommand(cmdStr.Str)
+	// if err != nil {
+	// 	return fmt.Errorf("error parsing command: %w", err)
+	// }
 
-	cmdAlt := ""
-	if len(args) > 0 {
-		cmdAlt = fmt.Sprintf("%s/%s", cmd, args[0])
-	}
+	// cmdAlt := ""
+	// if len(args) > 0 {
+	// 	cmdAlt = fmt.Sprintf("%s/%s", cmd, args[0])
+	// }
 
-	fmt.Printf("cmd: %s\n", cmd)
-	fmt.Printf("args: %v\n", args)
+	// fmt.Printf("cmd: %s\n", cmd)
+	// fmt.Printf("args: %v\n", args)
 
-	if cmdSet.get().Contains(cmdAlt) {
-		// If the cmdAlt is available, use it and adjust the args.
-		fmt.Printf("cmdAlt \"%s\" is available\n", cmdAlt)
-		cmd = cmdAlt
-		args = args[1:]
-	} else if cmdSet.get().Contains(cmd) {
-		fmt.Printf("cmd \"%s\" available\n", cmd)
-	} else {
-		fmt.Printf("neither cmd \"%s\" nor cmdAlt \"%s\" are available\n", cmd, cmdAlt)
-		return nil
-	}
+	// if cmdSet.get().Contains(cmdAlt) {
+	// 	// If the cmdAlt is available, use it and adjust the args.
+	// 	fmt.Printf("cmdAlt \"%s\" is available\n", cmdAlt)
+	// 	cmd = cmdAlt
+	// 	args = args[1:]
+	// } else if cmdSet.get().Contains(cmd) {
+	// 	fmt.Printf("cmd \"%s\" available\n", cmd)
+	// } else {
+	// 	fmt.Printf("neither cmd \"%s\" nor cmdAlt \"%s\" are available\n", cmd, cmdAlt)
+	// 	return nil
+	// }
 
-	fmt.Printf("using cmd \"%s\" and args \"%v\"", cmd, args)
-	cmdSuggestion, err := getCmdSuggestion(cmd)
-	if err != nil {
-		return fmt.Errorf("error getting cmd suggestion: %w", err)
-	}
+	// fmt.Printf("using cmd \"%s\" and args \"%v\"", cmd, args)
+	// cmdSuggestion, err := getCmdSuggestion(cmd)
+	// if err != nil {
+	// 	return fmt.Errorf("error getting cmd suggestion: %w", err)
+	// }
 
-	fmt.Printf("cmdSuggestion: %v\n", cmdSuggestion)
+	// fmt.Printf("cmdSuggestion: %v\n", cmdSuggestion)
+	cmdCobra = cobra.
+		carapace.Gen(cmdStr.Str)
 
 	return nil
 }
