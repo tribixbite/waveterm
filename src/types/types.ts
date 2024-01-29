@@ -320,6 +320,7 @@ type ModelUpdateType = {
     openaicmdinfochat?: OpenAICmdInfoChatMessageType[];
     alertmessage?: AlertMessageType;
     screenstatusindicator?: ScreenStatusIndicatorUpdateType;
+    userinputrequest?: UserInputRequest;
 };
 
 type HistoryViewDataType = {
@@ -578,6 +579,24 @@ type HistorySearchParams = {
     filterCmds?: boolean;
 };
 
+type UserInputRequest = {
+    requestid: string;
+    querytext: string;
+    responsetype: string;
+};
+
+type UserInputResponse = {
+    type: string;
+    text?: string;
+    confirm?: boolean;
+};
+
+type UserInputResponsePacket = {
+    type: string;
+    requestid: string;
+    response: UserInputResponse;
+};
+
 type RenderModeType = "normal" | "collapsed" | "expanded";
 
 type WebScreen = {
@@ -763,6 +782,9 @@ export type {
     RenderModeType,
     AlertMessageType,
     HistorySearchParams,
+    UserInputRequest,
+    UserInputResponse,
+    UserInputResponsePacket,
     ScreenLinesType,
     FocusTypeStrs,
     HistoryTypeStrs,
