@@ -67,6 +67,7 @@ type ModelUpdate struct {
 	OpenAICmdInfoChat     []*packet.OpenAICmdInfoChatMessage `json:"openaicmdinfochat,omitempty"`
 	AlertMessage          *AlertMessageType                  `json:"alertmessage,omitempty"`
 	ScreenStatusIndicator *ScreenStatusIndicatorType         `json:"screenstatusindicator,omitempty"`
+	ScreenNumRunningCommands *ScreenNumRunningCommandsType      `json:"screennumrunningcommands,omitempty"`
 	UserInputRequest      *UserInputRequestType              `json:"userinputrequest,omitempty"`
 }
 
@@ -284,6 +285,11 @@ type BookmarksViewType struct {
 type ScreenStatusIndicatorType struct {
 	ScreenId string               `json:"screenid"`
 	Status   StatusIndicatorLevel `json:"status"`
+}
+
+type ScreenNumRunningCommandsType struct {
+	ScreenId string `json:"screenid"`
+	Num      int    `json:"num"`
 }
 
 func (bus *UpdateBus) registerUserInputChannel() (string, chan *UserInputResponseType) {

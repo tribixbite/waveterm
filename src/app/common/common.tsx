@@ -13,6 +13,7 @@ import { RemoteType, StatusIndicatorLevel } from "../../types/types";
 import ReactDOM from "react-dom";
 import { GlobalModel } from "../../model/model";
 import * as appconst from "../appconst";
+import { checkKeyPressed, adaptFromReactOrNativeKeyEvent } from "../../util/keyutil";
 
 import { ReactComponent as CheckIcon } from "../assets/icons/line/check.svg";
 import { ReactComponent as CopyIcon } from "../assets/icons/history/copy.svg";
@@ -117,7 +118,7 @@ class Checkbox extends React.Component<
     constructor(props) {
         super(props);
         this.state = {
-            checkedInternal: this.props.checked !== undefined ? this.props.checked : Boolean(this.props.defaultChecked),
+            checkedInternal: this.props.checked ?? Boolean(this.props.defaultChecked),
         };
         this.generatedId = `checkbox-${Checkbox.idCounter++}`;
     }
@@ -287,15 +288,16 @@ class Button extends React.Component<ButtonProps> {
     }
 
     render() {
-        const { leftIcon, rightIcon, theme, children, disabled, variant, color, style } = this.props;
+        const { leftIcon, rightIcon, theme, children, disabled, variant, color, style, autoFocus, className } =
+            this.props;
 
         return (
             <button
-                className={cn("wave-button", theme, variant, color, { disabled: disabled })}
+                className={cn("wave-button", theme, variant, color, { disabled: disabled }, className)}
                 onClick={this.handleClick}
                 disabled={disabled}
                 style={style}
-                autoFocus={this.props.autoFocus}
+                autoFocus={autoFocus}
             >
                 {leftIcon && <span className="icon-left">{leftIcon}</span>}
                 {children}
@@ -714,13 +716,14 @@ class InlineSettingsTextEdit extends React.Component<
 
     @boundMethod
     handleKeyDown(e: any): void {
-        if (e.code == "Enter") {
+        let waveEvent = adaptFromReactOrNativeKeyEvent(e);
+        if (checkKeyPressed(waveEvent, "Enter")) {
             e.preventDefault();
             e.stopPropagation();
             this.confirmChange();
             return;
         }
-        if (e.code == "Escape") {
+        if (checkKeyPressed(waveEvent, "Escape")) {
             e.preventDefault();
             e.stopPropagation();
             this.cancelChange();
@@ -868,7 +871,7 @@ class Markdown extends React.Component<
         if (codeSelect) {
             return <CodeBlockMarkdown codeSelectSelectedIndex={codeSelectIndex}>{props.children}</CodeBlockMarkdown>;
         } else {
-            let clickHandler = (e: React.MouseEvent<HTMLElement>) => {
+            const clickHandler = (e: React.MouseEvent<HTMLElement>) => {
                 let blockText = (e.target as HTMLElement).innerText;
                 if (blockText) {
                     blockText = blockText.replace(/\n$/, ""); // remove trailing newline
@@ -896,7 +899,9 @@ class Markdown extends React.Component<
         };
         return (
             <div className={cn("markdown content", this.props.extraClassName)} style={this.props.style}>
-                <ReactMarkdown children={text} remarkPlugins={[remarkGfm]} components={markdownComponents} />
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {text}
+                </ReactMarkdown>
             </div>
         );
     }
@@ -1239,38 +1244,6 @@ class Modal extends React.Component<ModalProps> {
     }
 }
 
-interface StatusIndicatorProps {
-    level: StatusIndicatorLevel;
-    className?: string;
-}
-
-class StatusIndicator extends React.Component<StatusIndicatorProps> {
-    render() {
-        const statusIndicatorLevel = this.props.level;
-        let statusIndicator = null;
-        if (statusIndicatorLevel != StatusIndicatorLevel.None) {
-            let statusIndicatorClass = null;
-            switch (statusIndicatorLevel) {
-                case StatusIndicatorLevel.Output:
-                    statusIndicatorClass = "output";
-                    break;
-                case StatusIndicatorLevel.Success:
-                    statusIndicatorClass = "success";
-                    break;
-                case StatusIndicatorLevel.Error:
-                    statusIndicatorClass = "error";
-                    break;
-            }
-            statusIndicator = (
-                <div
-                    className={`${this.props.className} fa-sharp fa-solid fa-circle-small status-indicator ${statusIndicatorClass}`}
-                ></div>
-            );
-        }
-        return statusIndicator;
-    }
-}
-
 function ShowWaveShellInstallPrompt(callbackFn: () => void) {
     let message: string = `
 In order to use Wave's advanced features like unified history and persistent sessions, Wave installs a small, open-source helper program called WaveShell on your remote machine.  WaveShell does not open any external ports and only communicates with your *local* Wave terminal instance over ssh.  For more information please see [the docs](https://docs.waveterm.dev/reference/waveshell).        
@@ -1313,6 +1286,5 @@ export {
     LinkButton,
     Status,
     Modal,
-    StatusIndicator,
     ShowWaveShellInstallPrompt,
 };

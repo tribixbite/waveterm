@@ -1118,13 +1118,15 @@ type CmdType struct {
 	Status       string              `json:"status"`
 	CmdPid       int                 `json:"cmdpid"`
 	RemotePid    int                 `json:"remotepid"`
+	RestartTs    int64               `json:"restartts,omitempty"`
 	DoneTs       int64               `json:"donets"`
 	ExitCode     int                 `json:"exitcode"`
 	DurationMs   int                 `json:"durationms"`
 	RunOut       []packet.PacketType `json:"runout,omitempty"`
 	RtnState     bool                `json:"rtnstate,omitempty"`
 	RtnStatePtr  ShellStatePtr       `json:"rtnstateptr,omitempty"`
-	Remove       bool                `json:"remove,omitempty"`
+	Remove       bool                `json:"remove,omitempty"`    // not persisted to DB
+	Restarted    bool                `json:"restarted,omitempty"` // not persisted to DB
 }
 
 func (r *RemoteType) ToMap() map[string]interface{} {
@@ -1189,6 +1191,7 @@ func (cmd *CmdType) ToMap() map[string]interface{} {
 	rtn["status"] = cmd.Status
 	rtn["cmdpid"] = cmd.CmdPid
 	rtn["remotepid"] = cmd.RemotePid
+	rtn["restartts"] = cmd.RestartTs
 	rtn["donets"] = cmd.DoneTs
 	rtn["exitcode"] = cmd.ExitCode
 	rtn["durationms"] = cmd.DurationMs
@@ -1216,6 +1219,7 @@ func (cmd *CmdType) FromMap(m map[string]interface{}) bool {
 	quickSetInt(&cmd.CmdPid, m, "cmdpid")
 	quickSetInt(&cmd.RemotePid, m, "remotepid")
 	quickSetInt64(&cmd.DoneTs, m, "donets")
+	quickSetInt64(&cmd.RestartTs, m, "restartts")
 	quickSetInt(&cmd.ExitCode, m, "exitcode")
 	quickSetInt(&cmd.DurationMs, m, "durationms")
 	quickSetJson(&cmd.RunOut, m, "runout")
@@ -1474,7 +1478,6 @@ func SetReleaseInfo(ctx context.Context, releaseInfo ReleaseInfoType) error {
 // Sets the in-memory status indicator for the given screenId to the given value and adds it to the ModelUpdate. By default, the active screen will be ignored when updating status. To force a status update for the active screen, set force=true.
 func SetStatusIndicatorLevel_Update(ctx context.Context, update *ModelUpdate, screenId string, level StatusIndicatorLevel, force bool) error {
 	var newStatus StatusIndicatorLevel
-
 	if force {
 		// Force the update and set the new status to the given level, regardless of the current status or the active screen
 		ScreenMemSetIndicatorLevel(screenId, level)
@@ -1511,14 +1514,14 @@ func SetStatusIndicatorLevel_Update(ctx context.Context, update *ModelUpdate, sc
 }
 
 // Sets the in-memory status indicator for the given screenId to the given value and pushes the new value to the FE
-func SetStatusIndicatorLevel(ctx context.Context, screenId string, level StatusIndicatorLevel, force bool) {
+func SetStatusIndicatorLevel(ctx context.Context, screenId string, level StatusIndicatorLevel, force bool) error {
 	update := &ModelUpdate{}
 	err := SetStatusIndicatorLevel_Update(ctx, update, screenId, level, false)
 	if err != nil {
-		log.Printf("error setting status indicator level: %v\n", err)
-		return
+		return err
 	}
 	MainBus.SendUpdate(update)
+	return nil
 }
 
 // Resets the in-memory status indicator for the given screenId to StatusIndicatorLevel_None and adds it to the ModelUpdate
@@ -1528,7 +1531,23 @@ func ResetStatusIndicator_Update(update *ModelUpdate, screenId string) error {
 }
 
 // Resets the in-memory status indicator for the given screenId to StatusIndicatorLevel_None and pushes the new value to the FE
-func ResetStatusIndicator(screenId string) {
+func ResetStatusIndicator(screenId string) error {
 	// We do not need to set context when resetting the status indicator because we will not need to call the DB
-	SetStatusIndicatorLevel(context.TODO(), screenId, StatusIndicatorLevel_None, true)
+	return SetStatusIndicatorLevel(context.TODO(), screenId, StatusIndicatorLevel_None, true)
+}
+
+func IncrementNumRunningCmds_Update(update *ModelUpdate, screenId string, delta int) {
+	newNum := ScreenMemIncrementNumRunningCommands(screenId, delta)
+	log.Printf("IncrementNumRunningCmds_Update: screenId=%s, newNum=%d\n", screenId, newNum)
+	update.ScreenNumRunningCommands = &ScreenNumRunningCommandsType{
+		ScreenId: screenId,
+		Num:      newNum,
+	}
+}
+
+func IncrementNumRunningCmds(screenId string, delta int) {
+	log.Printf("IncrementNumRunningCmds: screenId=%s, delta=%d\n", screenId, delta)
+	update := &ModelUpdate{}
+	IncrementNumRunningCmds_Update(update, screenId, delta)
+	MainBus.SendUpdate(update)
 }

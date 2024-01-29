@@ -245,12 +245,14 @@ type CmdDataType = {
     status: string;
     cmdpid: number;
     remotepid: number;
+    restartts: number;
     donets: number;
     exitcode: number;
     durationms: number;
     runout: any[];
     rtnstate: boolean;
     remove?: boolean;
+    restarted?: boolean;
 };
 
 type PtyDataUpdateType = {
@@ -295,7 +297,12 @@ enum StatusIndicatorLevel {
 type ScreenStatusIndicatorUpdateType = {
     screenid: string;
     status: StatusIndicatorLevel;
-}
+};
+
+type ScreenNumRunningCommandsUpdateType = {
+    screenid: string;
+    num: number;
+};
 
 type ModelUpdateType = {
     interactive: boolean;
@@ -320,6 +327,7 @@ type ModelUpdateType = {
     openaicmdinfochat?: OpenAICmdInfoChatMessageType[];
     alertmessage?: AlertMessageType;
     screenstatusindicator?: ScreenStatusIndicatorUpdateType;
+    screennumrunningcommands?: ScreenNumRunningCommandsUpdateType;
     userinputrequest?: UserInputRequest;
 };
 
@@ -823,6 +831,4 @@ export type {
     ScreenStatusIndicatorUpdateType,
 };
 
-export {
-    StatusIndicatorLevel,
-};
+export { StatusIndicatorLevel };
