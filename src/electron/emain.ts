@@ -14,6 +14,7 @@ import { sprintf } from "sprintf-js";
 import { v4 as uuidv4 } from "uuid";
 import { checkKeyPressed, adaptFromElectronKeyEvent, setKeyUtilPlatform } from "../util/keyutil";
 import { platform } from "os";
+import * as T from "../types/types";
 
 const WaveAppPathVarName = "WAVETERM_APP_PATH";
 const WaveDevVarName = "WAVETERM_DEV";
@@ -37,21 +38,25 @@ ensureDir(waveHome);
 // normalize darwin/x64 to darwin/amd64 for GOARCH compatibility
 let unamePlatform = process.platform;
 let unameArch: string = process.arch;
+``;
 if (unameArch == "x64") {
     unameArch = "amd64";
 }
-let logger;
-let loggerConfig = {
+let logger: winston.Logger;
+let transports: winston.transport[] = [
+    new winston.transports.File({ filename: path.join(waveHome, "waveterm-app.log"), level: "info" }),
+];
+if (isDev) {
+    transports.push(new winston.transports.Console());
+}
+let loggerConfig: winston.LoggerOptions = {
     level: "info",
     format: winston.format.combine(
         winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
         winston.format.printf((info) => `${info.timestamp} ${info.message}`)
     ),
-    transports: [new winston.transports.File({ filename: path.join(waveHome, "waveterm-app.log"), level: "info" })],
+    transports: transports,
 };
-if (isDev) {
-    loggerConfig.transports.push(new winston.transports.Console());
-}
 logger = winston.createLogger(loggerConfig);
 function log(...msg) {
     try {
@@ -75,7 +80,7 @@ if (isDev) {
 }
 let app = electron.app;
 app.setName(isDev ? "Wave (Dev)" : "Wave");
-let waveSrvProc = null;
+let waveSrvProc: child_process.ChildProcessWithoutNullStreams | null = null;
 let waveSrvShouldRestart = false;
 
 electron.dialog.showErrorBox = (title, content) => {
@@ -101,8 +106,8 @@ function checkPromptMigrate() {
         // don't migrate if we're running dev version or if wave home directory already exists
         return;
     }
-    let homeDir = process.env.HOME;
-    let promptHome = path.join(homeDir, "prompt");
+    let homeDir: string = process.env.HOME as string;
+    let promptHome: string = path.join(homeDir, "prompt");
     if (!fs.existsSync(promptHome) || !fs.existsSync(path.join(promptHome, "prompt.db"))) {
         // make sure we have a valid prompt home directory (prompt.db must exist inside)
         return;
@@ -170,7 +175,7 @@ function readAuthKey() {
     return authKeyStr.trim();
 }
 
-let menuTemplate = [
+let menuTemplate: (Electron.MenuItem | Electron.MenuItemConstructorOptions)[] = [
     {
         role: "appMenu",
         submenu: [
@@ -250,7 +255,7 @@ function shFrameNavHandler(event: any, url: any) {
     return;
 }
 
-function createMainWindow(clientData) {
+function createMainWindow(clientData: T.ClientDataType | null) {
     let bounds = calcBounds(clientData);
     setKeyUtilPlatform(platform());
     let win = new electron.BrowserWindow({
@@ -609,7 +614,9 @@ function runWaveSrv() {
         pReject(new Error(sprintf("failed to start local server (%s)", waveSrvCmd)));
         if (waveSrvShouldRestart) {
             waveSrvShouldRestart = false;
-            this.runWaveSrv();
+            // small timeout here so we can reuse the listen socket
+            // this is normally only used in dev mode for debugging
+            setTimeout(runWaveSrv, 500);
         }
     });
     proc.on("spawn", (e) => {
@@ -644,7 +651,7 @@ electron.ipcMain.on("context-editmenu", (event, { x, y }, opts) => {
     }
     console.log("context-editmenu");
     let menu = new electron.Menu();
-    let menuItem = null;
+    let menuItem: Electron.MenuItem;
     if (opts.showCut) {
         menuItem = new electron.MenuItem({ label: "Cut", role: "cut" });
         menu.append(menuItem);
@@ -657,7 +664,7 @@ electron.ipcMain.on("context-editmenu", (event, { x, y }, opts) => {
 });
 
 async function createMainWindowWrap() {
-    let clientData = null;
+    let clientData: T.ClientDataType | null = null;
     try {
         clientData = await getClientDataPoll(1);
     } catch (e) {
