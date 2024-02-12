@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,8 +21,11 @@ import (
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/scbase"
 )
 
+var screenDirLock = &sync.Mutex{}
+var screenDirCache = make(map[string]string) // locked with screenDirLock
+
 func CreateCmdPtyFile(ctx context.Context, screenId string, lineId string, maxSize int64) error {
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return err
 	}
@@ -33,7 +37,7 @@ func CreateCmdPtyFile(ctx context.Context, screenId string, lineId string, maxSi
 }
 
 func StatCmdPtyFile(ctx context.Context, screenId string, lineId string) (*cirfile.Stat, error) {
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +45,7 @@ func StatCmdPtyFile(ctx context.Context, screenId string, lineId string) (*cirfi
 }
 
 func ClearCmdPtyFile(ctx context.Context, screenId string, lineId string) error {
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return err
 	}
@@ -68,7 +72,7 @@ func AppendToCmdPtyBlob(ctx context.Context, screenId string, lineId string, dat
 	if pos < 0 {
 		return nil, fmt.Errorf("invalid seek pos '%d' in AppendToCmdPtyBlob", pos)
 	}
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +103,7 @@ func AppendToCmdPtyBlob(ctx context.Context, screenId string, lineId string, dat
 
 // returns (real-offset, data, err)
 func ReadFullPtyOutFile(ctx context.Context, screenId string, lineId string) (int64, []byte, error) {
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -113,7 +117,7 @@ func ReadFullPtyOutFile(ctx context.Context, screenId string, lineId string) (in
 
 // returns (real-offset, data, err)
 func ReadPtyOutFile(ctx context.Context, screenId string, lineId string, offset int64, maxSize int64) (int64, []byte, error) {
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -189,7 +193,7 @@ func FullSessionDiskSize() (map[string]SessionDiskSizeType, error) {
 }
 
 func DeletePtyOutFile(ctx context.Context, screenId string, lineId string) error {
-	ptyOutFileName, err := scbase.PtyOutFile(screenId, lineId)
+	ptyOutFileName, err := PtyOutFile(screenId, lineId)
 	if err != nil {
 		return err
 	}
@@ -218,10 +222,46 @@ func deleteScreenDirMakeCtx(screenId string) {
 }
 
 func DeleteScreenDir(ctx context.Context, screenId string) error {
-	screenDir, err := scbase.EnsureScreenDir(screenId)
+	screenDir, err := EnsureScreenDir(screenId)
 	if err != nil {
 		return fmt.Errorf("error getting screendir: %w", err)
 	}
 	log.Printf("delete screen dir, remove-all %s\n", screenDir)
 	return os.RemoveAll(screenDir)
+}
+
+func EnsureScreenDir(screenId string) (string, error) {
+	if screenId == "" {
+		return "", fmt.Errorf("cannot get screen dir for blank sessionid")
+	}
+	screenDirLock.Lock()
+	sdir, ok := screenDirCache[screenId]
+	screenDirLock.Unlock()
+	if ok {
+		return sdir, nil
+	}
+	scHome := scbase.GetWaveHomeDir()
+	sdir = path.Join(scHome, scbase.ScreensDirBaseName, screenId)
+	err := scbase.EnsureDir(sdir)
+	if err != nil {
+		return "", err
+	}
+	screenDirLock.Lock()
+	screenDirCache[screenId] = sdir
+	screenDirLock.Unlock()
+	return sdir, nil
+}
+
+func PtyOutFile(screenId string, lineId string) (string, error) {
+	sdir, err := EnsureScreenDir(screenId)
+	if err != nil {
+		return "", err
+	}
+	if screenId == "" {
+		return "", fmt.Errorf("cannot get ptyout file for blank screenid")
+	}
+	if lineId == "" {
+		return "", fmt.Errorf("cannot get ptyout file for blank lineid")
+	}
+	return fmt.Sprintf("%s/%s.ptyout.cf", sdir, lineId), nil
 }

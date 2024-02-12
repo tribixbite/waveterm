@@ -122,7 +122,7 @@ func createWaveAuthKeyFile(fileName string) (string, error) {
 
 func ReadWaveAuthKey() (string, error) {
 	homeDir := GetWaveHomeDir()
-	err := ensureDir(homeDir)
+	err := EnsureDir(homeDir)
 	if err != nil {
 		return "", fmt.Errorf("cannot find/create WAVETERM_HOME directory %q", homeDir)
 	}
@@ -149,7 +149,7 @@ func ReadWaveAuthKey() (string, error) {
 
 func AcquireWaveLock() (*os.File, error) {
 	homeDir := GetWaveHomeDir()
-	err := ensureDir(homeDir)
+	err := EnsureDir(homeDir)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find/create WAVETERM_HOME directory %q", homeDir)
 	}
@@ -180,7 +180,7 @@ func EnsureSessionDir(sessionId string) (string, error) {
 	}
 	scHome := GetWaveHomeDir()
 	sdir = path.Join(scHome, SessionsDirBaseName, sessionId)
-	err := ensureDir(sdir)
+	err := EnsureDir(sdir)
 	if err != nil {
 		return "", err
 	}
@@ -197,35 +197,13 @@ func GetSessionsDir() string {
 	return sdir
 }
 
-func EnsureScreenDir(screenId string) (string, error) {
-	if screenId == "" {
-		return "", fmt.Errorf("cannot get screen dir for blank sessionid")
-	}
-	BaseLock.Lock()
-	sdir, ok := ScreenDirCache[screenId]
-	BaseLock.Unlock()
-	if ok {
-		return sdir, nil
-	}
-	scHome := GetWaveHomeDir()
-	sdir = path.Join(scHome, ScreensDirBaseName, screenId)
-	err := ensureDir(sdir)
-	if err != nil {
-		return "", err
-	}
-	BaseLock.Lock()
-	ScreenDirCache[screenId] = sdir
-	BaseLock.Unlock()
-	return sdir, nil
-}
-
 func GetScreensDir() string {
 	waveHome := GetWaveHomeDir()
 	sdir := path.Join(waveHome, ScreensDirBaseName)
 	return sdir
 }
 
-func ensureDir(dirName string) error {
+func EnsureDir(dirName string) error {
 	info, err := os.Stat(dirName)
 	if errors.Is(err, fs.ErrNotExist) {
 		err = os.MkdirAll(dirName, 0700)
@@ -257,20 +235,6 @@ func PtyOutFile_Sessions(sessionId string, cmdId string) (string, error) {
 		return "", fmt.Errorf("cannot get ptyout file for blank cmdid")
 	}
 	return fmt.Sprintf("%s/%s.ptyout.cf", sdir, cmdId), nil
-}
-
-func PtyOutFile(screenId string, lineId string) (string, error) {
-	sdir, err := EnsureScreenDir(screenId)
-	if err != nil {
-		return "", err
-	}
-	if screenId == "" {
-		return "", fmt.Errorf("cannot get ptyout file for blank screenid")
-	}
-	if lineId == "" {
-		return "", fmt.Errorf("cannot get ptyout file for blank lineid")
-	}
-	return fmt.Sprintf("%s/%s.ptyout.cf", sdir, lineId), nil
 }
 
 func GenWaveUUID() string {

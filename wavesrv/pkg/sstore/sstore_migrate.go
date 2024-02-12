@@ -91,12 +91,12 @@ func RunMigration20() error {
 
 func processMigration20Chunk(ctx context.Context, mchunk []cmdMigration20Type) error {
 	for _, mig := range mchunk {
-		newFile, err := scbase.PtyOutFile(mig.ScreenId, mig.LineId)
+		newFile, err := PtyOutFile(mig.ScreenId, mig.LineId)
 		if err != nil {
 			log.Printf("ptyoutfile(lineid) error: %v\n", err)
 			continue
 		}
-		oldFile, err := scbase.PtyOutFile(mig.ScreenId, mig.CmdId)
+		oldFile, err := PtyOutFile(mig.ScreenId, mig.CmdId)
 		if err != nil {
 			log.Printf("ptyoutfile(cmdid) error: %v\n", err)
 			continue
@@ -158,7 +158,7 @@ func RunMigration13() error {
 
 func processMigration13Chunk(ctx context.Context, mchunk []cmdMigration13Type) error {
 	for _, mig := range mchunk {
-		newFile, err := scbase.PtyOutFile(mig.ScreenId, mig.CmdId)
+		newFile, err := PtyOutFile(mig.ScreenId, mig.CmdId)
 		if err != nil {
 			log.Printf("ptyoutfile error: %v\n", err)
 			continue
