@@ -824,7 +824,7 @@ func main() {
 		return
 	}
 	if len(os.Args) >= 2 && strings.HasPrefix(os.Args[1], "--migrate") {
-		err := sstore.MigrateCommandOpts(os.Args[1:])
+		err := sstore.MainDBMigrateCommandOpts(os.Args[1:])
 		if err != nil {
 			log.Printf("[error] migrate cmd: %v\n", err)
 		}
@@ -836,7 +836,7 @@ func main() {
 		return
 	}
 	GlobalAuthKey = authKey
-	err = sstore.TryMigrateUp()
+	err = sstore.MainDBTryMigrateUp()
 	if err != nil {
 		log.Printf("[error] migrate up: %v\n", err)
 		return

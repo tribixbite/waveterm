@@ -22,23 +22,37 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 )
 
-const MaxMigration = 31
+const MaxMainDBMigration = 31
 const MigratePrimaryScreenVersion = 9
 const CmdScreenSpecialMigration = 13
 const CmdLineSpecialMigration = 20
 const RISpecialMigration = 30
 
-func MakeMigrate() (*migrate.Migrate, error) {
+func MakeMainDBMigrate() (*migrate.Migrate, error) {
 	fsVar, err := iofs.New(sh2db.MigrationFS, "migrations")
 	if err != nil {
 		return nil, fmt.Errorf("opening iofs: %w", err)
 	}
-	// migrationPathUrl := fmt.Sprintf("file://%s", path.Join(wd, "db", "migrations"))
 	dbUrl := fmt.Sprintf("sqlite3://%s", GetDBName())
 	m, err := migrate.NewWithSourceInstance("iofs", fsVar, dbUrl)
-	// m, err := migrate.New(migrationPathUrl, dbUrl)
 	if err != nil {
 		return nil, fmt.Errorf("making migration db[%s]: %w", GetDBName(), err)
+	}
+	return m, nil
+}
+
+func MakeFileDBMigrate(screenId string) (*migrate.Migrate, error) {
+	fsVar, err := iofs.New(sh2db.MigrationFS, "filedb-migrations")
+	if err != nil {
+		return nil, fmt.Errorf("opening iofs: %w", err)
+	}
+	dbUrl, err := MakeFileDBUrl(screenId)
+	if err != nil {
+		return nil, fmt.Errorf("making file db url for screenid %s: %w", screenId, err)
+	}
+	m, err := migrate.NewWithSourceInstance("iofs", fsVar, dbUrl)
+	if err != nil {
+		return nil, fmt.Errorf("making migration db[%s]: %w", dbUrl, err)
 	}
 	return m, nil
 }
@@ -95,11 +109,7 @@ func MigrateUpStep(m *migrate.Migrate, newVersion uint) error {
 	return nil
 }
 
-func MigrateUp(targetVersion uint) error {
-	m, err := MakeMigrate()
-	if err != nil {
-		return err
-	}
+func MigrateUp(m *migrate.Migrate, targetVersion uint) error {
 	curVersion, dirty, err := MigrateVersion(m)
 	if dirty {
 		return fmt.Errorf("cannot migrate up, database is dirty")
@@ -135,11 +145,7 @@ func MigrateUp(targetVersion uint) error {
 // returns curVersion, dirty, error
 func MigrateVersion(m *migrate.Migrate) (uint, bool, error) {
 	if m == nil {
-		var err error
-		m, err = MakeMigrate()
-		if err != nil {
-			return 0, false, err
-		}
+		return 0, false, fmt.Errorf("migrate object is nil")
 	}
 	curVersion, dirty, err := m.Version()
 	if err == migrate.ErrNilVersion {
@@ -148,52 +154,60 @@ func MigrateVersion(m *migrate.Migrate) (uint, bool, error) {
 	return curVersion, dirty, err
 }
 
-func MigrateDown() error {
-	m, err := MakeMigrate()
-	if err != nil {
-		return err
-	}
-	err = m.Down()
+func MigrateDown(m *migrate.Migrate) error {
+	err := m.Down()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func MigrateGoto(n uint) error {
-	curVersion, _, _ := MigrateVersion(nil)
+func MigrateGoto(m *migrate.Migrate, n uint) error {
+	curVersion, _, _ := MigrateVersion(m)
 	if curVersion == n {
 		return nil
 	}
 	if curVersion < n {
-		return MigrateUp(n)
+		return MigrateUp(m, n)
 	}
-	m, err := MakeMigrate()
-	if err != nil {
-		return err
-	}
-	err = m.Migrate(n)
+	err := m.Migrate(n)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func TryMigrateUp() error {
-	curVersion, _, _ := MigrateVersion(nil)
+func MainDBTryMigrateUp() error {
+	m, err := MakeMainDBMigrate()
+	if err != nil {
+		return fmt.Errorf("error trying to run main-db migrations: %w", err)
+	}
+	return TryMigrateUp(m)
+}
+
+func FileDBMigrateUp(screenId string) error {
+	m, err := MakeFileDBMigrate(screenId)
+	if err != nil {
+		return fmt.Errorf("error trying to run file-db migrations for screenid %s: %w", screenId, err)
+	}
+	return m.Up()
+}
+
+func TryMigrateUp(m *migrate.Migrate) error {
+	curVersion, _, _ := MigrateVersion(m)
 	log.Printf("[db] db version = %d\n", curVersion)
-	if curVersion >= MaxMigration {
+	if curVersion >= MaxMainDBMigration {
 		return nil
 	}
-	err := MigrateUp(MaxMigration)
+	err := MigrateUp(m, MaxMainDBMigration)
 	if err != nil {
 		return err
 	}
-	return MigratePrintVersion()
+	return MigratePrintVersion(m)
 }
 
-func MigratePrintVersion() error {
-	version, dirty, err := MigrateVersion(nil)
+func MigratePrintVersion(m *migrate.Migrate) error {
+	version, dirty, err := MigrateVersion(m)
 	if err != nil {
 		return fmt.Errorf("error getting db version: %v", err)
 	}
@@ -204,22 +218,25 @@ func MigratePrintVersion() error {
 	return nil
 }
 
-func MigrateCommandOpts(opts []string) error {
-	var err error
+func MainDBMigrateCommandOpts(opts []string) error {
+	m, err := MakeMainDBMigrate()
+	if err != nil {
+		return fmt.Errorf("error trying to run main-db migrations: %w", err)
+	}
 	if opts[0] == "--migrate-up" {
 		fmt.Printf("migrate-up %v\n", GetDBName())
 		time.Sleep(3 * time.Second)
-		err = MigrateUp(MaxMigration)
+		err = MigrateUp(m, MaxMainDBMigration)
 	} else if opts[0] == "--migrate-down" {
 		fmt.Printf("migrate-down %v\n", GetDBName())
 		time.Sleep(3 * time.Second)
-		err = MigrateDown()
+		err = MigrateDown(m)
 	} else if opts[0] == "--migrate-goto" {
 		n, err := strconv.Atoi(opts[1])
 		if err == nil {
 			fmt.Printf("migrate-goto %v => %d\n", GetDBName(), n)
 			time.Sleep(3 * time.Second)
-			err = MigrateGoto(uint(n))
+			err = MigrateGoto(m, uint(n))
 		}
 	} else {
 		err = fmt.Errorf("invalid migration command")
@@ -230,5 +247,5 @@ func MigrateCommandOpts(opts []string) error {
 	if err != nil {
 		return err
 	}
-	return MigratePrintVersion()
+	return MigratePrintVersion(m)
 }

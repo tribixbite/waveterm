@@ -13,7 +13,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,70 +22,159 @@ import (
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/scbase"
 )
 
-const MaxDBFileSize = 10 * 1024
+const MaxFileDBInlineFileSize = 10 * 1024
 
 var screenDirLock = &sync.Mutex{}
 var screenDirCache = make(map[string]string) // locked with screenDirLock
 
-var globalDBFileCache = makeDBFileCache()
+var globalFileDBCache = makeFileDBCache()
 
-type dbFileCacheEntry struct {
-	DBLock *sync.Mutex
-	DB     *sqlx.DB
-	InUse  atomic.Bool
+type fileDBCacheEntry struct {
+	ScreenId string
+	CVar     *sync.Cond // condition variable to lock entry fields and wait on InUse flag
+	DB       *sqlx.DB   // can be nil (when not in use), will need to be reopend on access
+	InUse    bool
+	Migrated bool // only try to migrate the DB once per run
+	Waiters  int
+	LastUse  time.Time
+	OpenErr  error // we cache open errors (and return them on GetDB)
 }
 
-type DBFileCache struct {
+// we store all screens in this cache (added on demand)
+// when not in use we can close the DB object
+type FileDBCache struct {
 	Lock  *sync.Mutex
-	Cache map[string]*dbFileCacheEntry
+	Cache map[string]*fileDBCacheEntry // key = screenid
 }
 
-func makeDBFileCache() *DBFileCache {
-	return &DBFileCache{
-		Lock:  &sync.Mutex{},
-		Cache: make(map[string]*dbFileCacheEntry),
-	}
-}
-
-func (c *DBFileCache) GetDB(screenId string) (*sqlx.DB, error) {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
-	entry := c.Cache[screenId]
+// will create an entry if it doesn't exist
+func (dbc *FileDBCache) GetEntry(screenId string) *fileDBCacheEntry {
+	dbc.Lock.Lock()
+	defer dbc.Lock.Unlock()
+	entry := dbc.Cache[screenId]
 	if entry != nil {
-		entry.DBLock.Lock()
-		entry.InUse.Store(true)
-		return entry.DB, nil
+		return entry
 	}
-	_, err := EnsureScreenDir(screenId)
+	entry = &fileDBCacheEntry{
+		ScreenId: screenId,
+		CVar:     sync.NewCond(&sync.Mutex{}),
+		DB:       nil,
+		Migrated: false,
+		InUse:    false,
+		Waiters:  0,
+		LastUse:  time.Time{},
+	}
+	dbc.Cache[screenId] = entry
+	return entry
+}
+
+func makeFileDBCache() *FileDBCache {
+	return &FileDBCache{
+		Lock:  &sync.Mutex{},
+		Cache: make(map[string]*fileDBCacheEntry),
+	}
+}
+
+func MakeFileDBUrl(screenId string) (string, error) {
+	screenDir, err := EnsureScreenDir(screenId)
+	if err != nil {
+		return "", err
+	}
+	fileDBName := path.Join(screenDir, "filedb.db")
+	return fmt.Sprintf("file:%s?cache=shared&mode=rwc&_journal_mode=WAL&_busy_timeout=5000", fileDBName), nil
+}
+
+func MakeFileDB(screenId string) (*sqlx.DB, error) {
+	dbUrl, err := MakeFileDBUrl(screenId)
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return sqlx.Open("sqlite3", dbUrl)
 }
 
-func (c *DBFileCache) ReleaseDB(screenId string, db *sqlx.DB) {
-	entry := c.Cache[screenId]
-	if entry == nil {
-		// this shouldn't happen (error)
-		log.Printf("[db] error missing cache entry for dbfile %s", screenId)
-		return
+// will close the DB if not in use (and no waiters)
+// returns (closed, closeErr)
+// if we cannot close the DB (in use), then we return (false, nil)
+// if DB is already closed, we'll return (true, nil)
+// if there is an error closing the DB, we'll return (true, err)
+// on successful close returns (true, nil)
+func (entry *fileDBCacheEntry) CloseDB() (bool, error) {
+	entry.CVar.L.Lock()
+	defer entry.CVar.L.Unlock()
+	if entry.DB == nil {
+		return true, nil
 	}
-	entry.DBLock.Unlock()
-	entry.InUse.Store(false)
-	// noop for now
+	if entry.InUse || entry.Waiters > 0 {
+		return false, nil
+	}
+	err := entry.DB.Close()
+	entry.DB = nil
+	return true, err
+}
+
+// will create DB if doesn't exist
+// will Wait() on CVar if InUse
+// updates Waiters appropriately
+func (entry *fileDBCacheEntry) GetDB() (*sqlx.DB, error) {
+	entry.CVar.L.Lock()
+	defer entry.CVar.L.Unlock()
+	if entry.OpenErr != nil {
+		return nil, entry.OpenErr
+	}
+	entry.Waiters++
+	for {
+		if entry.InUse {
+			entry.CVar.Wait()
+			continue
+		}
+		break
+	}
+	entry.Waiters--
+	if !entry.Migrated {
+		FileDBMigrateUp(entry.ScreenId)
+		entry.Migrated = true
+	}
+	if entry.DB == nil {
+		db, err := MakeFileDB(entry.ScreenId)
+		if err != nil {
+			entry.OpenErr = err
+			return nil, err
+		}
+		entry.DB = db
+	}
+	entry.InUse = true
+	entry.LastUse = time.Now()
+	return entry.DB, nil
+}
+
+func (entry *fileDBCacheEntry) ReleaseDB() {
+	entry.CVar.L.Lock()
+	defer entry.CVar.L.Unlock()
+	entry.InUse = false
+	entry.CVar.Signal()
+}
+
+func (c *FileDBCache) GetDB(screenId string) (*sqlx.DB, error) {
+	entry := c.GetEntry(screenId)
+	return entry.GetDB()
+}
+
+func (c *FileDBCache) ReleaseDB(screenId string, db *sqlx.DB) {
+	entry := c.Cache[screenId]
+	entry.ReleaseDB()
 }
 
 // fulfills the txwrap DBGetter interface
-type DBFileGetter struct {
+type FileDBGetter struct {
 	ScreenId string
 }
 
-func (g DBFileGetter) GetDB(ctx context.Context) (*sqlx.DB, error) {
-	return globalDBFileCache.GetDB(g.ScreenId)
+func (g FileDBGetter) GetDB(ctx context.Context) (*sqlx.DB, error) {
+	return globalFileDBCache.GetDB(g.ScreenId)
 }
 
-func (g DBFileGetter) ReleaseDB(db *sqlx.DB) {
-	globalDBFileCache.ReleaseDB(g.ScreenId, db)
+func (g FileDBGetter) ReleaseDB(db *sqlx.DB) {
+	globalFileDBCache.ReleaseDB(g.ScreenId, db)
 }
 
 func TryConvertPtyFile(ctx context.Context, screenId string, lineId string) error {
@@ -94,7 +182,7 @@ func TryConvertPtyFile(ctx context.Context, screenId string, lineId string) erro
 	if err != nil {
 		return fmt.Errorf("convert ptyfile, cannot stat: %w", err)
 	}
-	if stat.DataSize > MaxDBFileSize {
+	if stat.DataSize > MaxFileDBInlineFileSize {
 		return nil
 	}
 	return nil
