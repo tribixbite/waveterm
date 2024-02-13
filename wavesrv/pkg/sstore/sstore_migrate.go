@@ -142,7 +142,7 @@ func RunMigration13() error {
 	}
 	err := os.RemoveAll(scbase.GetSessionsDir())
 	if err != nil {
-		return fmt.Errorf("cannot remove old sessions dir %s: %w\n", scbase.GetSessionsDir(), err)
+		return fmt.Errorf("cannot remove old sessions dir %s: %w", scbase.GetSessionsDir(), err)
 	}
 	txErr = WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE client SET cmdstoretype = 'screen'`

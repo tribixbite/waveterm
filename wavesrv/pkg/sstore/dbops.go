@@ -477,9 +477,7 @@ func GetConnectUpdate(ctx context.Context) (*ConnectUpdate, error) {
 		}
 		query := `SELECT * FROM screen ORDER BY archived, screenidx, archivedts`
 		screens := dbutil.SelectMapsGen[*ScreenType](tx, query)
-		for _, screen := range screens {
-			update.Screens = append(update.Screens, screen)
-		}
+		update.Screens = append(update.Screens, screens...)
 		query = `SELECT * FROM remote_instance`
 		riArr := dbutil.SelectMapsGen[*RemoteInstance](tx, query)
 		for _, ri := range riArr {
@@ -674,7 +672,7 @@ func fmtUniqueName(name string, defaultFmtStr string, startIdx int, strs []strin
 	} else {
 		fmtStr = defaultFmtStr
 	}
-	if strings.Index(fmtStr, "%d") == -1 {
+	if !strings.Contains(fmtStr, "%d") {
 		panic("invalid fmtStr: " + fmtStr)
 	}
 	for {
@@ -1159,7 +1157,7 @@ func ArchiveScreen(ctx context.Context, sessionId string, screenId string) (Upda
 			return fmt.Errorf("cannot close screen (not found)")
 		}
 		if isWebShare(tx, screenId) {
-			return fmt.Errorf("cannot archive screen while web-sharing.  stop web-sharing before trying to archive.")
+			return fmt.Errorf("cannot archive screen while web-sharing.  stop web-sharing before trying to archive")
 		}
 		query = `SELECT archived FROM screen WHERE sessionid = ? AND screenid = ?`
 		closeVal := tx.GetBool(query, sessionId, screenId)

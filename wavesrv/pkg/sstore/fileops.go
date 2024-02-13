@@ -13,16 +13,92 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/wavetermdev/waveterm/waveshell/pkg/cirfile"
 	"github.com/wavetermdev/waveterm/waveshell/pkg/shexec"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/scbase"
 )
 
+const MaxDBFileSize = 10 * 1024
+
 var screenDirLock = &sync.Mutex{}
 var screenDirCache = make(map[string]string) // locked with screenDirLock
+
+var globalDBFileCache = makeDBFileCache()
+
+type dbFileCacheEntry struct {
+	DBLock *sync.Mutex
+	DB     *sqlx.DB
+	InUse  atomic.Bool
+}
+
+type DBFileCache struct {
+	Lock  *sync.Mutex
+	Cache map[string]*dbFileCacheEntry
+}
+
+func makeDBFileCache() *DBFileCache {
+	return &DBFileCache{
+		Lock:  &sync.Mutex{},
+		Cache: make(map[string]*dbFileCacheEntry),
+	}
+}
+
+func (c *DBFileCache) GetDB(screenId string) (*sqlx.DB, error) {
+	c.Lock.Lock()
+	defer c.Lock.Unlock()
+	entry := c.Cache[screenId]
+	if entry != nil {
+		entry.DBLock.Lock()
+		entry.InUse.Store(true)
+		return entry.DB, nil
+	}
+	_, err := EnsureScreenDir(screenId)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (c *DBFileCache) ReleaseDB(screenId string, db *sqlx.DB) {
+	entry := c.Cache[screenId]
+	if entry == nil {
+		// this shouldn't happen (error)
+		log.Printf("[db] error missing cache entry for dbfile %s", screenId)
+		return
+	}
+	entry.DBLock.Unlock()
+	entry.InUse.Store(false)
+	// noop for now
+}
+
+// fulfills the txwrap DBGetter interface
+type DBFileGetter struct {
+	ScreenId string
+}
+
+func (g DBFileGetter) GetDB(ctx context.Context) (*sqlx.DB, error) {
+	return globalDBFileCache.GetDB(g.ScreenId)
+}
+
+func (g DBFileGetter) ReleaseDB(db *sqlx.DB) {
+	globalDBFileCache.ReleaseDB(g.ScreenId, db)
+}
+
+func TryConvertPtyFile(ctx context.Context, screenId string, lineId string) error {
+	stat, err := StatCmdPtyFile(ctx, screenId, lineId)
+	if err != nil {
+		return fmt.Errorf("convert ptyfile, cannot stat: %w", err)
+	}
+	if stat.DataSize > MaxDBFileSize {
+		return nil
+	}
+	return nil
+}
 
 func CreateCmdPtyFile(ctx context.Context, screenId string, lineId string, maxSize int64) error {
 	ptyOutFileName, err := PtyOutFile(screenId, lineId)
