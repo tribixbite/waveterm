@@ -14,7 +14,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +27,7 @@ import (
 	"github.com/armon/circbuf"
 	"github.com/creack/pty"
 	"github.com/google/uuid"
+	"github.com/pkg/sftp"
 	"github.com/wavetermdev/waveterm/waveshell/pkg/base"
 	"github.com/wavetermdev/waveterm/waveshell/pkg/packet"
 	"github.com/wavetermdev/waveterm/waveshell/pkg/server"
@@ -88,6 +91,9 @@ const WaveshellServerRunOnlyFmt = `
   [%PINGPACKET%]
   mshell-[%VERSION%] --server
 `
+const InitCommand = `
+printf "\n##N{\"type\": \"init\", \"notfound\": true, \"uname\": \"%s|%s\"}\n" "$(uname -s)" "$(uname -m)";
+`
 
 func MakeLocalMShellCommandStr(isSudo bool) (string, error) {
 	mshellPath, err := scbase.LocalMShellBinaryPath()
@@ -144,6 +150,7 @@ type pendingStateKey struct {
 // remove once ssh library is stabilized
 type Launcher interface {
 	Launch(*MShellProc, bool)
+	RunInstall(*MShellProc)
 }
 
 type MShellProc struct {
@@ -175,6 +182,7 @@ type MShellProc struct {
 	RunningCmds      map[base.CommandKey]RunCmdType
 	PendingStateCmds map[pendingStateKey]base.CommandKey // key=[remoteinstance name]
 	launcher         Launcher                            // for conditional launch method based on ssh library in use. remove once ssh library is stabilized
+	Client           *ssh.Client
 }
 
 type RunCmdType struct {
@@ -199,6 +207,10 @@ func CanComplete(remoteType string) bool {
 // remove once ssh library is stabilized
 func (msh *MShellProc) Launch(interactive bool) {
 	msh.launcher.Launch(msh, interactive)
+}
+
+func (msh *MShellProc) RunInstall() {
+	msh.launcher.RunInstall(msh)
 }
 
 func (msh *MShellProc) GetStatus() string {
@@ -1057,7 +1069,197 @@ func (msh *MShellProc) WaitAndSendPassword(pw string) {
 	}
 }
 
-func (msh *MShellProc) RunInstall() {
+func (NewLauncher) RunInstall(msh *MShellProc) {
+	remoteCopy := msh.GetRemoteCopy()
+	if remoteCopy.Archived {
+		msh.WriteToPtyBuffer("*error: cannot install on archived remote\n")
+		return
+	}
+	baseStatus := msh.GetStatus()
+	if baseStatus == StatusConnecting || baseStatus == StatusConnected {
+		msh.WriteToPtyBuffer("*error: cannot install on remote that is connected/connecting, disconnect to install\n")
+		return
+	}
+	curStatus := msh.GetInstallStatus()
+	if curStatus == StatusConnecting {
+		msh.WriteToPtyBuffer("*error: cannot install on remote that is already trying to install, cancel current install to try again\n")
+		return
+	}
+
+	msh.WriteToPtyBuffer("installing mshell %s to %s...\n", scbase.MShellVersion, remoteCopy.RemoteCanonicalName)
+	clientCtx, clientCancelFn := context.WithCancel(context.Background())
+	defer clientCancelFn()
+	msh.WithLock(func() {
+		msh.InstallErr = nil
+		msh.InstallStatus = StatusConnecting
+		msh.InstallCancelFn = clientCancelFn
+		go msh.NotifyRemoteUpdate()
+	})
+
+	if msh.Remote.IsLocal() {
+		srcBinPath, err := scbase.MShellBinaryPath(base.MShellVersion, runtime.GOOS, runtime.GOARCH)
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		newBinName := fmt.Sprintf("mshell-%s", semver.MajorMinor(scbase.MShellVersion))
+		dstBinPath := filepath.Join(homeDir, ".mshell", newBinName)
+
+		srcBinFile, err := os.Open(srcBinPath)
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		defer srcBinFile.Close()
+		// destination file should be handled manually - not closed with defer
+		dstBinFile, err := os.OpenFile(dstBinPath, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		_, err = io.Copy(dstBinFile, srcBinFile)
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			dstBinFile.Close()
+			return
+		}
+		err = dstBinFile.Close()
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+
+	} else {
+		session, err := msh.Client.NewSession()
+		defer session.Close()
+		if err != nil {
+			statusErr := fmt.Errorf("ssh cannot create session: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		cproc, initPk, err := shexec.MakeInstallProc(clientCtx, shexec.SessionWrap{Session: session, StartCmd: InitCommand}) //TODO
+		if err == context.Canceled {
+			msh.WriteToPtyBuffer("*install canceled\n")
+			msh.WithLock(func() {
+				msh.InstallStatus = StatusDisconnected
+				go msh.NotifyRemoteUpdate()
+			})
+			return
+		}
+		if err != nil {
+			statusErr := fmt.Errorf("cannot create init packet: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		defer cproc.Close()
+		goos, goarch, err := shexec.DetectGoArch(initPk.UName)
+		if err != nil {
+			statusErr := fmt.Errorf("cannot determine architecture: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		srcBinPath, err := scbase.MShellBinaryPath(base.MShellVersion, goos, goarch)
+		if err != nil {
+			statusErr := fmt.Errorf("cannot find source binary: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		fileClient, err := sftp.NewClient(msh.Client)
+		if err != nil {
+			statusErr := fmt.Errorf("cannot estabish sftp connection: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		homeDir, err := fileClient.Getwd()
+		if err != nil {
+			statusErr := fmt.Errorf("cannot determine remote home directory: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		newBinName := fmt.Sprintf("mshell-%s", semver.MajorMinor(scbase.MShellVersion))
+		dstBinPath := filepath.Join(homeDir, ".mshell", newBinName)
+
+		srcBinFile, err := os.Open(srcBinPath)
+		if err != nil {
+			statusErr := fmt.Errorf("cannot find source executable: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		defer srcBinFile.Close()
+		// destination file should be handled manually - not closed with defer
+		dstBinFile, err := fileClient.OpenFile(dstBinPath, os.O_RDWR|os.O_CREATE)
+		if err != nil {
+			statusErr := fmt.Errorf("cannot create destination executable: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		err = dstBinFile.Chmod(0755)
+		if err != nil {
+			statusErr := fmt.Errorf("cannot set executable permissions: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+		_, err = io.Copy(dstBinFile, srcBinFile)
+		if err != nil {
+			statusErr := fmt.Errorf("unable to copy to new waveshell executable: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			dstBinFile.Close()
+			return
+		}
+		err = dstBinFile.Close()
+		if err != nil {
+			statusErr := fmt.Errorf("unable to save waveshell executable: %w", err)
+			msh.WriteToPtyBuffer("*error, %s\n", statusErr.Error())
+			msh.setInstallErrorStatus(statusErr)
+			return
+		}
+	}
+	var connectMode string
+	msh.WithLock(func() {
+		msh.InstallStatus = StatusDisconnected
+		msh.InstallCancelFn = nil
+		msh.NeedsMShellUpgrade = false
+		msh.Status = StatusDisconnected
+		msh.Err = nil
+		connectMode = msh.Remote.ConnectMode
+	})
+	msh.WriteToPtyBuffer("successfully installed mshell %s to ~/.mshell\n", scbase.MShellVersion)
+	go msh.NotifyRemoteUpdate()
+	if connectMode == sstore.ConnectModeStartup || connectMode == sstore.ConnectModeAuto {
+		// the install was successful, and we don't have a manual connect mode, try to connect
+		go msh.Launch(true)
+	}
+	return
+}
+
+func (LegacyLauncher) RunInstall(msh *MShellProc) {
 	remoteCopy := msh.GetRemoteCopy()
 	if remoteCopy.Archived {
 		msh.WriteToPtyBuffer("*error: cannot install on archived remote\n")
@@ -1381,6 +1583,7 @@ func (NewLauncher) Launch(msh *MShellProc, interactive bool) {
 			msh.setErrorStatus(statusErr)
 			return
 		}
+		msh.Client = client
 		var session *ssh.Session
 		session, err = client.NewSession()
 		if err != nil {
