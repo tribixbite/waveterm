@@ -753,32 +753,6 @@ class LineCmd extends React.Component<
                             />
                         </If>
                     </ErrorBoundary>
-                    <If condition={cmd.getRtnState()}>
-                        <div
-                            key="rtnstate"
-                            className="cmd-rtnstate"
-                            style={{
-                                visibility: cmd.getStatus() == "done" ? "visible" : "hidden",
-                            }}
-                        >
-                            <If condition={rsdiff == null || rsdiff == ""}>
-                                <div className="cmd-rtnstate-label">state unchanged</div>
-                                <div className="cmd-rtnstate-sep"></div>
-                            </If>
-                            <If condition={rsdiff != null && rsdiff != ""}>
-                                <div className="cmd-rtnstate-label">new state</div>
-                                <div className="cmd-rtnstate-sep"></div>
-                                <div className="cmd-rtnstate-diff" style={{ fontSize: rtnStateDiffSize }}>
-                                    <div className="cmd-rtnstate-diff-inner">{this.rtnStateDiff.get()}</div>
-                                </div>
-                            </If>
-                        </div>
-                    </If>
-                    <If condition={isSelected && !isFocused && rendererType == "terminal"}>
-                        <div className="cmd-hints">
-                            <div className="hint-item color-nohover-white">focus line ({renderCmdText("L")})</div>
-                        </div>
-                    </If>
                 </If>
             </div>
         );

@@ -189,6 +189,10 @@ class Model {
             }
             return fontSize;
         });
+        mobx.autorun(() => {
+            const fontSize = this.termFontSize.get();
+            this._setCssTermFontSize(fontSize);
+        });
         getApi().onTCmd(this.onTCmd.bind(this));
         getApi().onICmd(this.onICmd.bind(this));
         getApi().onLCmd(this.onLCmd.bind(this));
@@ -345,16 +349,10 @@ class Model {
         return appconst.ProdServerEndpoint;
     }
 
-    setTermFontSize(fontSize: number) {
-        if (fontSize < appconst.MinFontSize) {
-            fontSize = appconst.MinFontSize;
-        }
-        if (fontSize > appconst.MaxFontSize) {
-            fontSize = appconst.MaxFontSize;
-        }
-        mobx.action(() => {
-            this.termFontSize.set(fontSize);
-        })();
+    _setCssTermFontSize(fontSize: number) {
+        const root = document.documentElement;
+        root.style.setProperty("--termfontsize", fontSize + "px");
+        root.style.setProperty("--termlinehight", Math.ceil(fontSize * 1.2) + "px");
     }
 
     getBaseWsHostPort(): string {
