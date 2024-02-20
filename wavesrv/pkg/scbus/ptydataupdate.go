@@ -47,4 +47,7 @@ func MakePtyDataUpdate(update *PtyDataUpdate) *PtyDataUpdatePacketType {
 func init() {
 	// Register the PtyDataUpdatePacketType with the packet package
 	packet.RegisterPacketType(PtyDataUpdateStr, reflect.TypeOf(PtyDataUpdatePacketType{}))
+
+	// Enforce the UpdatePacket interface
+	var _ UpdatePacket = (*PtyDataUpdatePacketType)(nil)
 }

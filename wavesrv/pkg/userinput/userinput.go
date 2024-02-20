@@ -74,4 +74,8 @@ func GetUserInput(ctx context.Context, bus *scbus.RpcBus, userInputRequest *User
 func init() {
 	// Register the user input request packet type
 	packet.RegisterPacketType(UserInputResponsePacketStr, reflect.TypeOf(UserInputResponsePacketType{}))
+
+	// Enforce the interfaces
+	var _ scbus.RpcResponse = (*UserInputResponsePacketType)(nil)
+	var _ scbus.RpcPacket = (*UserInputRequestType)(nil)
 }

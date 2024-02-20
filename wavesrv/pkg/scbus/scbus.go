@@ -67,6 +67,9 @@ type UpdatePacket interface {
 	IsEmpty() bool
 }
 
+// Enforce that UpdatePacket is a packet.PacketType
+var _ packet.PacketType = (UpdatePacket)(nil)
+
 // A channel for sending model updates to the client
 type UpdateChannel struct {
 	ScreenId string
@@ -88,6 +91,9 @@ func (sch *UpdateChannel) Match(screenId string) bool {
 	}
 	return screenId == sch.ScreenId
 }
+
+// Enforce that UpdateChannel is a Channel
+var _ Channel[UpdatePacket] = (*UpdateChannel)(nil)
 
 // A collection of channels that can transmit updates
 type UpdateBus struct {
@@ -205,6 +211,9 @@ func (ch *RpcChannel) SetChannel(newCh chan RpcResponse) {
 func (ch *RpcChannel) Match(string) bool {
 	return true
 }
+
+// Enforce that RpcChannel is a Channel
+var _ Channel[RpcResponse] = (*RpcChannel)(nil)
 
 // Send a user input request to the frontend and wait for a response
 func (bus *RpcBus) DoRpc(ctx context.Context, pk RpcPacket) (RpcResponse, error) {

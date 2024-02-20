@@ -126,4 +126,7 @@ type CleanableUpdateItem interface {
 func init() {
 	// Register the model update packet type
 	packet.RegisterPacketType(ModelUpdateStr, reflect.TypeOf(ModelUpdatePacketType{}))
+
+	// Enforce the UpdatePacket interface
+	var _ UpdatePacket = (*ModelUpdatePacketType)(nil)
 }
