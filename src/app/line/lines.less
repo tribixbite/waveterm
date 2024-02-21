@@ -75,10 +75,17 @@
         }
 
         .meta.meta-line1 {
-            margin-left: 2px;
             color: rgba(@base-color, 0.6) !important;
             font-size: var(--termfontsize);
         }
+
+        .meta.meta-line2 {
+            margin-left: -2px;
+        }
+    }
+
+    &.has-rtnstate .terminal-wrapper {
+        padding-bottom: 0;
     }
 
     .image-wrapper {
@@ -438,6 +445,7 @@
     padding: 0 0 10px 0;
     flex-grow: 1;
     position: relative;
+    overflow-x: hidden;
 
     &::-webkit-scrollbar-thumb {
         background-color: transparent !important;
