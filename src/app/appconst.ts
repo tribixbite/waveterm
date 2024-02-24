@@ -16,6 +16,8 @@ export const LineContainer_Sidebar = "sidebar";
 
 export const ConfirmKey_HideShellPrompt = "hideshellprompt";
 
+export const DefaultTermFontFamily = "JetBrains Mono";
+
 export const NoStrPos = -1;
 
 export const RemotePtyRows = 8;
