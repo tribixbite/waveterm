@@ -15,6 +15,7 @@ import { handleJsonFetchResponse } from "@/util/util";
 import { v4 as uuidv4 } from "uuid";
 import { checkKeyPressed, adaptFromElectronKeyEvent, setKeyUtilPlatform } from "@/util/keyutil";
 import { platform } from "os";
+import installExtension, { REACT_DEVELOPER_TOOLS } from "electron-devtools-installer";
 
 const WaveAppPathVarName = "WAVETERM_APP_PATH";
 const WaveDevVarName = "WAVETERM_DEV";
@@ -794,6 +795,13 @@ function reregisterGlobalShortcut(shortcut: string) {
     }
     setTimeout(runActiveTimer, 5000); // start active timer, wait 5s just to be safe
     await app.whenReady();
+    try {
+        await installExtension(REACT_DEVELOPER_TOOLS);
+        console.log("installed react devtools");
+    } catch (e) {
+        console.log("An error occurred: ", e);
+    }
+
     await createMainWindowWrap();
     app.on("activate", () => {
         if (electron.BrowserWindow.getAllWindows().length === 0) {
