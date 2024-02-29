@@ -247,9 +247,9 @@ class MainSideBar extends React.Component<MainSideBarProps, {}> {
      */
     setMiddleHeightSubtractor() {
         const windowHeight = window.innerHeight;
-        const bottomHeight = windowHeight - window.document.getElementById("sidebar-bottom")?.offsetTop;
+        const bottomHeight = window.document.getElementById("sidebar-bottom")?.offsetHeight;
         const middleTop = document.getElementById("sidebar-middle")?.offsetTop;
-        const newMiddleHeightSubtractor = bottomHeight + middleTop;
+        const newMiddleHeightSubtractor = bottomHeight + middleTop + 200;
         if (!Number.isNaN(newMiddleHeightSubtractor)) {
             mobx.action(() => {
                 this.middleHeightSubtractor.set(newMiddleHeightSubtractor);
@@ -278,14 +278,6 @@ class MainSideBar extends React.Component<MainSideBarProps, {}> {
                 {(toggleCollapse) => (
                     <React.Fragment>
                         <div className="title-bar-drag">
-                            <div className="logo">
-                                <If condition={sidebarWidth > 215}>
-                                    <WaveLogoWord />
-                                </If>
-                                <If condition={sidebarWidth <= 215}>
-                                    <WaveLogo />
-                                </If>
-                            </div>
                             <div className="close-button">
                                 <i className="fa-sharp fa-solid fa-xmark-large" onClick={toggleCollapse} />
                             </div>
@@ -332,6 +324,11 @@ class MainSideBar extends React.Component<MainSideBarProps, {}> {
                             >
                                 {this.getSessions()}
                             </div>
+                            <div className="sidebar-spacer" />
+                            <div className="sidebar-logo-div">
+                                <img src="public/logos/wave-logo.png" alt="logo" />
+                            </div>
+                            <div className="sidebar-spacer" />
                             <div className="bottom" id="sidebar-bottom">
                                 {this.getUpdateAppBanner()}
                                 <If condition={GlobalModel.isDev}>
