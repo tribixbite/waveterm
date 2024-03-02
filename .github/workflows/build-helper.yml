@@ -67,10 +67,63 @@ jobs:
                   name: waveterm-build-${{ matrix.platform }}
                   path: out/make/*
                   retention-days: 2
+    runbuild-linux-arm:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/checkout@v4
+              with:
+                  repository: scripthaus-dev/scripthaus
+                  path: scripthaus
+            - name: Install Linux Build Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install rpm flatpak flatpak-builder snapcraft
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{env.GO_VERSION}}
+                  cache-dependency-path: |
+                      wavesrv/go.sum
+                      waveshell/go.sum
+                      scripthaus/go.sum
+            - name: Install Scripthaus
+              run: |
+                  go work use ./scripthaus;
+                  cd scripthaus;
+                  go get ./...;
+                  CGO_ENABLED=1 go build -o scripthaus cmd/main.go
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{env.NODE_VERSION}}
+                  cache: "yarn"
+            - name: Set Version
+              id: set-version
+              run: |
+                  VERSION=$(node -e 'console.log(require("./version.js"))')
+                  echo "WAVETERM_VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+            - name: Install Yarn Dependencies
+              run: yarn --frozen-lockfile
+            - name: Build linux/arm64
+              uses: pguyot/arm-runner-action@v2
+              with:
+                  image_additional_mb: 2000
+                  base_image: dietpi:rpi_armv8_bullseye
+                  bind_mount_repository: true
+                  commands: |
+                      sudo apt-get update && sudo apt-get install -y snapd git
+                      sudo snap install --classic go
+                      git clone
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: waveterm-build-linux-arm
+                  path: out/make/*
+                  retention-days: 2
+
     upload:
         name: "Upload Builds"
         runs-on: ubuntu-latest
-        needs: [runbuild]
+        needs: [runbuild, runbuild-linux-arm]
         steps:
             - uses: actions/download-artifact@v4
               with:
