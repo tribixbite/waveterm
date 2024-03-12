@@ -13,11 +13,11 @@ jobs:
               run: |
                   VERSION=$(node -e 'console.log(require("./version.js"))')
                   echo "WAVETERM_VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
-            - name: Copy staged artifacts to the release bucket
+            - name: Download staged artifacts
               run: |
-                  . ./buildres/publish-from-staging.sh
+                  . ./buildres/download-staged-artifacts.sh
               env:
                   AWS_ACCESS_KEY_ID: "${{ secrets.S3_USERID }}"
                   AWS_SECRET_ACCESS_KEY: "${{ secrets.S3_SECRETKEY }}"
                   AWS_DEFAULT_REGION: us-west-2
-            - name: Publish to Ubuntu PPA
+            - name: Generate Flatpak manifest
