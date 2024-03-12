@@ -21,3 +21,4 @@ jobs:
                   AWS_SECRET_ACCESS_KEY: "${{ secrets.S3_SECRETKEY }}"
                   AWS_DEFAULT_REGION: us-west-2
             - name: Generate Flatpak manifest
+              run: . ./buildres/flatpak/generate-flatpak-manifest.sh
