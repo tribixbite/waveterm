@@ -2,12 +2,18 @@ name: Publish a new release
 on:
     release:
         types: [published]
+env:
+    NODE_VERSION: "21.5.0"
 jobs:
     build:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
               uses: actions/checkout@v2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{env.NODE_VERSION}}
+                  cache: "yarn"
             - name: Get the version
               id: get_version
               run: |
@@ -21,4 +27,4 @@ jobs:
                   AWS_SECRET_ACCESS_KEY: "${{ secrets.S3_SECRETKEY }}"
                   AWS_DEFAULT_REGION: us-west-2
             - name: Generate Flatpak manifest
-              run: . ./buildres/flatpak/generate-flatpak-manifest.sh
+              run: node buildres/flatpak/generate-flatpak-manifest.js
