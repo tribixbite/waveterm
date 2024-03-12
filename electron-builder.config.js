@@ -73,7 +73,7 @@ const config = {
         executableName: pkg.productName,
         category: "TerminalEmulator",
         icon: "public/waveterm.icns",
-        target: ["zip", "deb", "rpm", "AppImage", "pacman"],
+        target: ["zip", "deb", "rpm", "AppImage", "pacman", "snap"],
         synopsis: pkg.description,
         description: null,
         desktop: {
@@ -85,6 +85,17 @@ const config = {
     },
     appImage: {
         license: "LICENSE",
+    },
+    snap: {
+        base: "core20",
+        grade: "stable",
+        confinement: "strict",
+        summary: pkg.productName,
+        title: pkg.productName,
+        description: null,
+        synopsis: pkg.description,
+        allowNativeWayland: true,
+        compression: "xz",
     },
     publish: {
         provider: "generic",
