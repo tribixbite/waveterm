@@ -89,7 +89,7 @@ const config = {
     snap: {
         base: "core20",
         grade: "stable",
-        confinement: "strict",
+        confinement: "classic",
         summary: pkg.productName,
         title: pkg.productName,
         description: null,
