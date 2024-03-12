@@ -96,6 +96,13 @@ const config = {
         synopsis: pkg.description,
         allowNativeWayland: true,
         compression: "xz",
+        executableName: pkg.productName,
+        desktop: {
+            Name: pkg.productName,
+            Comment: pkg.description,
+            Keywords: "developer;terminal;emulator;",
+            category: "Development;Utility;",
+        },
     },
     publish: {
         provider: "generic",
