@@ -56,6 +56,7 @@ const config = {
                 arch: "universal",
             },
         ],
+        appId: "dev.commandline.waveterm",
         icon: "public/waveterm.icns",
         category: "public.app-category.developer-tools",
         minimumSystemVersion: "10.15.0",
@@ -70,6 +71,7 @@ const config = {
             .map((f) => path.resolve(f.path, f.name)),
     },
     linux: {
+        appId: "dev.commandline.waveterm",
         executableName: pkg.productName,
         category: "TerminalEmulator",
         icon: "public/waveterm.icns",
@@ -95,7 +97,13 @@ const config = {
         description: null,
         synopsis: pkg.description,
         allowNativeWayland: true,
-        desktop: undefined,
+        desktop: {
+            Name: pkg.productName,
+            Comment: pkg.description,
+            Keywords: "developer;terminal;emulator;",
+            category: "Development;Utility;",
+            exec: pkg.productName,
+        },
     },
     publish: {
         provider: "generic",
