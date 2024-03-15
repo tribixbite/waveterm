@@ -1,69 +1,116 @@
-app-id: dev.commandline.waveterm
-runtime: org.freedesktop.Platform
+app-id: com.visualstudio.code
+default-branch: stable
+runtime: org.freedesktop.Sdk
 runtime-version: '23.08'
 sdk: org.freedesktop.Sdk
 base: org.electronjs.Electron2.BaseApp
 base-version: '23.08'
-command: wave
+command: code
+tags: [proprietary]
+separate-locales: false
 finish-args:
-  - --share=ipc
+  - --require-version=0.10.3
   - --share=network
-  - --socket=wayland
+  - --share=ipc
   - --socket=x11
-  - --socket=system-bus
-  - --socket=session-bus
-  - --device=dri
+  - --socket=pulseaudio
+  - --socket=ssh-auth
   - --device=all
-  - --env=XDG_CURRENT_DESKTOP=Unity
+  - --allow=devel
+  - --filesystem=host
+  - --env=NPM_CONFIG_GLOBALCONFIG=/app/etc/npmrc
+  - --env=LD_LIBRARY_PATH=/app/lib
+  # required to fix cursor scaling on wayland
   - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
-  - --talk-name=org.kde.StatusNotifierWatcher
+  - --system-talk-name=org.freedesktop.login1
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.freedesktop.Flatpak
   - --talk-name=com.canonical.AppMenu.Registrar
-  - --system-talk-name=org.freedesktop.login1
-  - --filesystem=host
-  - --filesystem=home
-  - --persist=
-rename-desktop-file: Wave.desktop
-rename-icon: Wave
+  - --talk-name=com.canonical.AppMenu.Registrar.*
+add-extensions:
+  com.visualstudio.code.tool:
+    directory: tools
+    subdirectories: true
+    version: '23.08'
+    add-ld-path: lib
+    no-autodownload: true
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/gtk-doc
+  - '*.la'
 modules:
-  - name: waveterm-desktop
+  - shared-modules/libusb/libusb.json
+
+  - name: vscode
     buildsystem: simple
     build-commands:
-      - ar -x Wave*.deb
-      - rm -f Wave*.deb
-      - tar -xf data.tar.xz
-      - rm -f control.tar.gz data.tar.xz debian-binary
-      - cp -r opt/* usr/* $FLATPAK_DEST
-      - rm -rf opt usr
-      - install wave.sh $FLATPAK_DEST/bin/wave
-      - install -D -m 644 -t $FLATPAK_DEST/share/metainfo $FLATPAK_ID.metainfo.xml
-      - desktop-file-edit --set-key=Exec --set-value="Wave %U" $FLATPAK_DEST/share/applications/Wave.desktop
-      - rm -rf "${FLATPAK_DEST}/share/icons/hicolor/1024x1024/"
-
-      # To allow separate locales
-      # https://searchfox.org/mozilla-central/rev/8a4f55bc09ffc5c25dcb4586c51ae4a9fee77b4c/taskcluster/docker/firefox-flatpak/runme.sh#131-133
-      - |
-        for lang in ${FLATPAK_DEST}/Wave/locales/*.pak
-        do
-          locale="$(basename -s .pak $lang)"
-          install -Dm644 -t "${FLATPAK_DEST}/share/runtime/locale/${locale%%-*}/" "$lang"
-          ln -sf "${FLATPAK_DEST}/share/runtime/locale/${locale%%-*}/$(basename $lang)" "${FLATPAK_DEST}/Wave/locales/$(basename $lang)"
-        done
+      - install -D code.sh /app/bin/code
+      - install -Dm644 vscode_64.png /app/share/icons/hicolor/64x64/apps/com.visualstudio.code.png
+      - install -Dm644 vscode_128.png /app/share/icons/hicolor/128x128/apps/com.visualstudio.code.png
+      - install -Dm644 vscode_256.png /app/share/icons/hicolor/256x256/apps/com.visualstudio.code.png
+      - install -Dm644 vscode_512.png /app/share/icons/hicolor/512x512/apps/com.visualstudio.code.png
+      - install -Dm644 com.visualstudio.code.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 com.visualstudio.code.desktop -t /app/share/applications
+      - install -Dm644 com.visualstudio.code-url-handler.desktop -t /app/share/applications
+      - install -Dm644 com.visualstudio.code-workspace.xml -t /app/share/mime/packages
+      - install -Dm644 npmrc -t /app/etc
+      - install -Dm644 flatpak-warning.txt -t /app/share/vscode
+      - install -D apply_extra -t /app/bin
+      - cp /usr/bin/ar /app/bin
+      - ARCH_TRIPLE=$(gcc --print-multiarch) && cp /usr/lib/${ARCH_TRIPLE}/libbfd-*.so
+        /app/lib
+      - ARCH_TRIPLE=$(gcc --print-multiarch) && ln -s /usr/lib/${ARCH_TRIPLE}/libtinfo.so/app/lib/libtinfo.so.5
+      - mkdir /app/tools
     sources:
+      - type: script
+        dest-filename: apply_extra
+        commands:
+          - ar x code.deb
+          - tar xf data.tar.xz
+          - mv usr/share/code vscode
+          - rm -r code.deb control.tar.* data.tar.xz debian-binary usr
       - type: file
-        only-arches:
-          - x86_64
+        path: code.sh
+      - type: file
+        path: flatpak-warning.txt
+      - type: file
+        path: npmrc
+      - type: file
+        path: com.visualstudio.code.metainfo.xml
+      - type: file
+        path: com.visualstudio.code.desktop
+      - type: file
+        path: com.visualstudio.code-url-handler.desktop
+      - type: file
+        path: com.visualstudio.code-workspace.xml
+      - type: file
+        path: icons/vscode_64.png
+      - type: file
+        path: icons/vscode_128.png
+      - type: file
+        path: icons/vscode_256.png
+      - type: file
+        path: icons/vscode_512.png
+      - type: extra-data
+        filename: code.deb
+        only-arches: [x86_64]
         url: <to-replace>
         sha256: <to-replace>
+        size: <to-replace>
         x-checker-data:
           type: electron-updater
           url: https://dl.waveterm.dev/releases/latest-linux.yml
-      - type: script
-        dest-filename: wave.sh
-        commands:
-          - export TMPDIR="$XDG_RUNTIME_DIR/app/$FLATPAK_ID"
-          - exec zypak-wrapper /app/Wave/Wave --ozone-platform-hint=auto
-            --enable-features=WaylandWindowDecorations "$@"
+          is-main-source: true
+
+  - name: host-spawn
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 host-spawn /app/bin/host-spawn
+    sources:
       - type: file
-        path: dev.commandline.waveterm.metainfo.xml
+        url: https://github.com/1player/host-spawn/releases/download/1.5.0/host-spawn-x86_64
+        sha256: dbf67e7e111c4fe1edb0c642cbb4193064ca5b384aeb1054fc2befba6ed88b83
+        dest-filename: host-spawn
+        only-arches: [x86_64]
