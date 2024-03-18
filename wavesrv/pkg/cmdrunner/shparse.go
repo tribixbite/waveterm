@@ -352,6 +352,40 @@ func unescapeBackSlashes(s string) string {
 	return string(newStr)
 }
 
+type ParamDecl struct {
+	Name      string `json:"name"`
+	ParamType string `json:"paramtype"`
+	NoQuote   bool   `json:"noquote"`
+}
+
+var commandParamRe = regexp.MustCompile(`@w\{\{.*?\}\}`)
+
+func parseCommandParams(cmdStr string) ([]ParamDecl, error) {
+	m := commandParamRe.FindAllString(cmdStr, -1)
+	if m == nil {
+		return nil, nil
+	}
+	var rtn []ParamDecl
+	for _, paramStr := range m {
+		paramStr = paramStr[4 : len(paramStr)-2]
+		parts := strings.Split(paramStr, ":")
+		decl := ParamDecl{Name: parts[0], ParamType: "str"}
+		for _, part := range parts[1:] {
+			if part == "noquote" {
+				decl.NoQuote = true
+				continue
+			}
+			if part == "int" {
+				decl.ParamType = "int"
+				continue
+			}
+			// silently ignore unknown parts (for now)
+		}
+		rtn = append(rtn, decl)
+	}
+	return rtn, nil
+}
+
 func EvalMetaCommand(ctx context.Context, origPk *scpacket.FeCommandPacketType) (*scpacket.FeCommandPacketType, error) {
 	if len(origPk.Args) == 0 {
 		return nil, fmt.Errorf("empty command (no fields)")
@@ -362,6 +396,15 @@ func EvalMetaCommand(ctx context.Context, origPk *scpacket.FeCommandPacketType) 
 	bracketArgs, cmdStr, err := EvalBracketArgs(origPk.Args[0])
 	if err != nil {
 		return nil, err
+	}
+	if !resolveBool(bracketArgs["noparse"], false) {
+		pdecls, err := parseCommandParams(cmdStr)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing command params: %v", err)
+		}
+		if len(pdecls) > 0 {
+			return nil, fmt.Errorf("command params not supported yet len:%d", len(pdecls))
+		}
 	}
 	metaCmd, metaSubCmd, commandArgs := parseMetaCmd(cmdStr)
 	rtnPk := scpacket.MakeFeCommandPacket()

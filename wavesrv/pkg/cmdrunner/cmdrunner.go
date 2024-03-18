@@ -716,7 +716,7 @@ func EvalCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (scbus.U
 	if rtnErr == nil {
 		update, rtnErr = HandleCommand(ctxWithHistory, newPk)
 	} else {
-		return nil, fmt.Errorf("error in Eval Meta Command: %w", rtnErr)
+		return nil, fmt.Errorf("[error] eval: %w", rtnErr)
 	}
 	if !resolveBool(pk.Kwargs["nohist"], false) {
 		// TODO should this be "pk" or "newPk" (2nd arg)
