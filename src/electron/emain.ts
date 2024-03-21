@@ -352,7 +352,6 @@ function createMainWindow(clientData: ClientDataType | null): Electron.BrowserWi
     const indexHtml = isDev ? "index-dev.html" : "index.html";
     win.loadFile(path.join(getElectronAppBasePath(), "public", indexHtml));
     win.webContents.on("before-input-event", (e, input) => {
-        const waveEvent = adaptFromElectronKeyEvent(input);
         if (win.isFocused()) {
             wasActive = true;
         }
@@ -380,7 +379,7 @@ function createMainWindow(clientData: ClientDataType | null): Electron.BrowserWi
     win.webContents.on("zoom-changed", (e) => {
         win.webContents.send("zoom-changed");
     });
-    win.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    win.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith("https://docs.waveterm.dev/")) {
             console.log("openExternal docs", url);
             electron.shell.openExternal(url);
@@ -399,6 +398,19 @@ function createMainWindow(clientData: ClientDataType | null): Electron.BrowserWi
         }
         console.log("window-open denied", url);
         return { action: "deny" };
+    });
+
+    electron.session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+            responseHeaders: {
+                ...details.responseHeaders,
+                "Content-Security-Policy": [
+                    `default-src 'file://${getElectronAppBasePath()}/dist${isDev ? "-dev" : ""}/'`,
+                    `script-src 'file://${getElectronAppBasePath()}/dist${isDev ? "-dev" : ""}/'`,
+                    `style-src 'file://${getElectronAppBasePath()}/dist${isDev ? "-dev" : ""}/'`,
+                ],
+            },
+        });
     });
 
     return win;
