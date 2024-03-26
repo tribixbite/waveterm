@@ -17,18 +17,6 @@ type ScreenOptsType struct {
 	PTerm    string `json:"pterm,omitempty"`
 }
 
-type ScreenLinesType struct {
-	ScreenId string             `json:"screenid"`
-	Lines    []*sstore.LineType `json:"lines" dbmap:"-"`
-	Cmds     []*sstore.CmdType  `json:"cmds" dbmap:"-"`
-}
-
-func (ScreenLinesType) UseDBMap() {}
-
-func (ScreenLinesType) GetType() string {
-	return "screenlines"
-}
-
 type ScreenWebShareOpts struct {
 	ShareName string `json:"sharename"`
 	ViewKey   string `json:"viewkey"`

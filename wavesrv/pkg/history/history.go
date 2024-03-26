@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/dbutil"
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/sstore"
+	"github.com/wavetermdev/waveterm/wavesrv/pkg/workspaces/line"
 )
 
 type HistoryItemType struct {
@@ -114,7 +115,7 @@ type HistoryViewData struct {
 	RawOffset     int                `json:"rawoffset"`
 	NextRawOffset int                `json:"nextrawoffset"`
 	HasMore       bool               `json:"hasmore"`
-	Lines         []*sstore.LineType `json:"lines"`
+	Lines         []*line.LineType   `json:"lines"`
 	Cmds          []*sstore.CmdType  `json:"cmds"`
 }
 
@@ -303,14 +304,14 @@ func getLineIdsFromHistoryItems(historyItems []*HistoryItemType) []string {
 	return rtn
 }
 
-func GetLineCmdsFromHistoryItems(ctx context.Context, historyItems []*HistoryItemType) ([]*sstore.LineType, []*sstore.CmdType, error) {
+func GetLineCmdsFromHistoryItems(ctx context.Context, historyItems []*HistoryItemType) ([]*line.LineType, []*sstore.CmdType, error) {
 	if len(historyItems) == 0 {
 		return nil, nil, nil
 	}
-	return sstore.WithTxRtn3(ctx, func(tx *sstore.TxWrap) ([]*sstore.LineType, []*sstore.CmdType, error) {
+	return sstore.WithTxRtn3(ctx, func(tx *sstore.TxWrap) ([]*line.LineType, []*sstore.CmdType, error) {
 		lineIdsJsonArr := dbutil.QuickJsonArr(getLineIdsFromHistoryItems(historyItems))
 		query := `SELECT * FROM line WHERE lineid IN (SELECT value FROM json_each(?))`
-		lineArr := dbutil.SelectMappable[*sstore.LineType](tx, query, lineIdsJsonArr)
+		lineArr := dbutil.SelectMappable[*line.LineType](tx, query, lineIdsJsonArr)
 		query = `SELECT * FROM cmd WHERE lineid IN (SELECT value FROM json_each(?))`
 		cmdArr := dbutil.SelectMapsGen[*sstore.CmdType](tx, query, lineIdsJsonArr)
 		return lineArr, cmdArr, nil

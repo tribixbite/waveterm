@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -291,99 +290,6 @@ func FmtUniqueName(name string, defaultFmtStr string, startIdx int, strs []strin
 	}
 }
 
-// special "E" returns last unarchived line, "EA" returns last line (even if archived)
-func FindLineIdByArg(ctx context.Context, screenId string, lineArg string) (string, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) (string, error) {
-		if lineArg == "E" {
-			query := `SELECT lineid FROM line WHERE screenid = ? AND NOT archived ORDER BY linenum DESC LIMIT 1`
-			lineId := tx.GetString(query, screenId)
-			return lineId, nil
-		}
-		if lineArg == "EA" {
-			query := `SELECT lineid FROM line WHERE screenid = ? ORDER BY linenum DESC LIMIT 1`
-			lineId := tx.GetString(query, screenId)
-			return lineId, nil
-		}
-		lineNum, err := strconv.Atoi(lineArg)
-		if err == nil {
-			// valid linenum
-			query := `SELECT lineid FROM line WHERE screenid = ? AND linenum = ?`
-			lineId := tx.GetString(query, screenId, lineNum)
-			return lineId, nil
-		} else if len(lineArg) == 8 {
-			// prefix id string match
-			query := `SELECT lineid FROM line WHERE screenid = ? AND substr(lineid, 1, 8) = ?`
-			lineId := tx.GetString(query, screenId, lineArg)
-			return lineId, nil
-		} else {
-			// id match
-			query := `SELECT lineid FROM line WHERE screenid = ? AND lineid = ?`
-			lineId := tx.GetString(query, screenId, lineArg)
-			return lineId, nil
-		}
-	})
-}
-
-func GetLineCmdByLineId(ctx context.Context, screenId string, lineId string) (*LineType, *CmdType, error) {
-	return WithTxRtn3(ctx, func(tx *TxWrap) (*LineType, *CmdType, error) {
-		query := `SELECT * FROM line WHERE screenid = ? AND lineid = ?`
-		lineVal := dbutil.GetMappable[*LineType](tx, query, screenId, lineId)
-		if lineVal == nil {
-			return nil, nil, nil
-		}
-		var cmdRtn *CmdType
-		query = `SELECT * FROM cmd WHERE screenid = ? AND lineid = ?`
-		cmdRtn = dbutil.GetMapGen[*CmdType](tx, query, screenId, lineId)
-		return lineVal, cmdRtn, nil
-	})
-}
-
-func InsertLine(ctx context.Context, line *LineType, cmd *CmdType) error {
-	if line == nil {
-		return fmt.Errorf("line cannot be nil")
-	}
-	if line.LineId == "" {
-		return fmt.Errorf("line must have lineid set")
-	}
-	if line.LineNum != 0 {
-		return fmt.Errorf("line should not hage linenum set")
-	}
-	if cmd != nil && cmd.ScreenId == "" {
-		return fmt.Errorf("cmd should have screenid set")
-	}
-	qjs := dbutil.QuickJson(line.LineState)
-	if len(qjs) > MaxLineStateSize {
-		return fmt.Errorf("linestate exceeds maxsize, size[%d] max[%d]", len(qjs), MaxLineStateSize)
-	}
-	return WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT screenid FROM screen WHERE screenid = ?`
-		if !tx.Exists(query, line.ScreenId) {
-			return fmt.Errorf("screen not found, cannot insert line[%s]", line.ScreenId)
-		}
-		query = `SELECT nextlinenum FROM screen WHERE screenid = ?`
-		nextLineNum := tx.GetInt(query, line.ScreenId)
-		line.LineNum = int64(nextLineNum)
-		query = `INSERT INTO line  ( screenid, userid, lineid, ts, linenum, linenumtemp, linelocal, linetype, linestate, text, renderer, ephemeral, contentheight, star, archived)
-                            VALUES (:screenid,:userid,:lineid,:ts,:linenum,:linenumtemp,:linelocal,:linetype,:linestate,:text,:renderer,:ephemeral,:contentheight,:star,:archived)`
-		tx.NamedExec(query, dbutil.ToDBMap(line, false))
-		query = `UPDATE screen SET nextlinenum = ? WHERE screenid = ?`
-		tx.Exec(query, nextLineNum+1, line.ScreenId)
-		if cmd != nil {
-			cmd.OrigTermOpts = cmd.TermOpts
-			cmdMap := cmd.ToMap()
-			query = `
-INSERT INTO cmd  ( screenid, lineid, remoteownerid, remoteid, remotename, cmdstr, rawcmdstr, festate, statebasehash, statediffhasharr, termopts, origtermopts, status, cmdpid, remotepid, donets, restartts, exitcode, durationms, rtnstate, runout, rtnbasehash, rtndiffhasharr)
-          VALUES (:screenid,:lineid,:remoteownerid,:remoteid,:remotename,:cmdstr,:rawcmdstr,:festate,:statebasehash,:statediffhasharr,:termopts,:origtermopts,:status,:cmdpid,:remotepid,:donets,:restartts,:exitcode,:durationms,:rtnstate,:runout,:rtnbasehash,:rtndiffhasharr)
-`
-			tx.NamedExec(query, cmdMap)
-		}
-		if IsWebShare(tx, line.ScreenId) {
-			InsertScreenLineUpdate(tx, line.ScreenId, line.LineId, UpdateType_LineNew)
-		}
-		return nil
-	})
-}
-
 func GetCmdByScreenId(ctx context.Context, screenId string, lineId string) (*CmdType, error) {
 	return WithTxRtn(ctx, func(tx *TxWrap) (*CmdType, error) {
 		query := `SELECT * FROM cmd WHERE screenid = ? AND lineid = ?`
@@ -574,7 +480,7 @@ func HangupCmd(ctx context.Context, ck base.CommandKey) (*ScreenType, error) {
 	})
 }
 
-func getNextId(ids []string, delId string) string {
+func GetNextId(ids []string, delId string) string {
 	if len(ids) == 0 {
 		return ""
 	}

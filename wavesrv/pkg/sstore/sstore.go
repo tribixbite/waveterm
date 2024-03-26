@@ -17,7 +17,6 @@ import (
 	"path"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -35,14 +34,12 @@ import (
 
 type RemotePtrType = scpacket.RemotePtrType
 
-const LineNoHeight = -1
 const DBFileName = "waveterm.db"
 const DBWALFileName = "waveterm.db-wal"
 const DBFileNameBackup = "backup.waveterm.db"
 const DBWALFileNameBackup = "backup.waveterm.db-wal"
 const MaxWebShareLineCount = 50
 const MaxWebShareScreenCount = 3
-const MaxLineStateSize = 4 * 1024 // 4k for now, can raise if needed
 
 const DefaultSessionName = "default"
 const LocalRemoteAlias = "local"
@@ -53,23 +50,6 @@ const APITokenSentinel = "--apitoken--"
 // defined here and not in packet.go since this value should never
 // be passed to waveshell (it should always get resolved prior to sending a run packet)
 const ShellTypePref_Detect = "detect"
-
-const (
-	LineTypeCmd    = "cmd"
-	LineTypeText   = "text"
-	LineTypeOpenAI = "openai"
-)
-
-const (
-	LineState_Source   = "prompt:source"
-	LineState_File     = "prompt:file"
-	LineState_FileUrl  = "wave:fileurl"
-	LineState_Min      = "wave:min"
-	LineState_Template = "template"
-	LineState_Mode     = "mode"
-	LineState_Lang     = "lang"
-	LineState_Minimap  = "minimap"
-)
 
 const (
 	MainViewSession     = "session"
@@ -452,27 +432,6 @@ func (ri *RemoteInstance) ToMap() map[string]interface{} {
 	return rtn
 }
 
-type LineType struct {
-	ScreenId      string         `json:"screenid"`
-	UserId        string         `json:"userid"`
-	LineId        string         `json:"lineid"`
-	Ts            int64          `json:"ts"`
-	LineNum       int64          `json:"linenum"`
-	LineNumTemp   bool           `json:"linenumtemp,omitempty"`
-	LineLocal     bool           `json:"linelocal"`
-	LineType      string         `json:"linetype"`
-	LineState     map[string]any `json:"linestate"`
-	Renderer      string         `json:"renderer,omitempty"`
-	Text          string         `json:"text,omitempty"`
-	Ephemeral     bool           `json:"ephemeral,omitempty"`
-	ContentHeight int64          `json:"contentheight,omitempty"`
-	Star          bool           `json:"star,omitempty"`
-	Archived      bool           `json:"archived,omitempty"`
-	Remove        bool           `json:"remove,omitempty"`
-}
-
-func (LineType) UseDBMap() {}
-
 type OpenAIUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
@@ -781,79 +740,6 @@ func (cmd *CmdType) FromMap(m map[string]interface{}) bool {
 
 func (cmd *CmdType) IsRunning() bool {
 	return cmd.Status == CmdStatusRunning || cmd.Status == CmdStatusDetached
-}
-
-func makeNewLineCmd(screenId string, userId string, lineId string, renderer string, lineState map[string]any) *LineType {
-	rtn := &LineType{}
-	rtn.ScreenId = screenId
-	rtn.UserId = userId
-	rtn.LineId = lineId
-	rtn.Ts = time.Now().UnixMilli()
-	rtn.LineLocal = true
-	rtn.LineType = LineTypeCmd
-	rtn.LineId = lineId
-	rtn.ContentHeight = LineNoHeight
-	rtn.Renderer = renderer
-	if lineState == nil {
-		lineState = make(map[string]any)
-	}
-	rtn.LineState = lineState
-	return rtn
-}
-
-func makeNewLineText(screenId string, userId string, text string) *LineType {
-	rtn := &LineType{}
-	rtn.ScreenId = screenId
-	rtn.UserId = userId
-	rtn.LineId = scbase.GenWaveUUID()
-	rtn.Ts = time.Now().UnixMilli()
-	rtn.LineLocal = true
-	rtn.LineType = LineTypeText
-	rtn.Text = text
-	rtn.ContentHeight = LineNoHeight
-	rtn.LineState = make(map[string]any)
-	return rtn
-}
-
-func makeNewLineOpenAI(screenId string, userId string, lineId string) *LineType {
-	rtn := &LineType{}
-	rtn.ScreenId = screenId
-	rtn.UserId = userId
-	rtn.LineId = lineId
-	rtn.Ts = time.Now().UnixMilli()
-	rtn.LineLocal = true
-	rtn.LineType = LineTypeOpenAI
-	rtn.ContentHeight = LineNoHeight
-	rtn.Renderer = CmdRendererOpenAI
-	rtn.LineState = make(map[string]any)
-	return rtn
-}
-
-func AddCommentLine(ctx context.Context, screenId string, userId string, commentText string) (*LineType, error) {
-	rtnLine := makeNewLineText(screenId, userId, commentText)
-	err := InsertLine(ctx, rtnLine, nil)
-	if err != nil {
-		return nil, err
-	}
-	return rtnLine, nil
-}
-
-func AddOpenAILine(ctx context.Context, screenId string, userId string, cmd *CmdType) (*LineType, error) {
-	rtnLine := makeNewLineOpenAI(screenId, userId, cmd.LineId)
-	err := InsertLine(ctx, rtnLine, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return rtnLine, nil
-}
-
-func AddCmdLine(ctx context.Context, screenId string, userId string, cmd *CmdType, renderer string, lineState map[string]any) (*LineType, error) {
-	rtnLine := makeNewLineCmd(screenId, userId, cmd.LineId, renderer, lineState)
-	err := InsertLine(ctx, rtnLine, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return rtnLine, nil
 }
 
 func EnsureLocalRemote(ctx context.Context) error {
