@@ -128,11 +128,6 @@ const (
 )
 
 const (
-	ScreenFocusInput = "input"
-	ScreenFocusCmd   = "cmd"
-)
-
-const (
 	CmdStoreTypeSession = "session"
 	CmdStoreTypeScreen  = "screen"
 )
@@ -300,198 +295,6 @@ func (ClientData) GetType() string {
 	return "clientdata"
 }
 
-type SessionType struct {
-	SessionId      string            `json:"sessionid"`
-	Name           string            `json:"name"`
-	SessionIdx     int64             `json:"sessionidx"`
-	ActiveScreenId string            `json:"activescreenid"`
-	ShareMode      string            `json:"sharemode"`
-	NotifyNum      int64             `json:"notifynum"`
-	Archived       bool              `json:"archived,omitempty"`
-	ArchivedTs     int64             `json:"archivedts,omitempty"`
-	Remotes        []*RemoteInstance `json:"remotes"`
-
-	// only for updates
-	Remove bool `json:"remove,omitempty"`
-}
-
-func (SessionType) GetType() string {
-	return "session"
-}
-
-func MakeSessionUpdateForRemote(sessionId string, ri *RemoteInstance) SessionType {
-	return SessionType{
-		SessionId: sessionId,
-		Remotes:   []*RemoteInstance{ri},
-	}
-}
-
-type SessionTombstoneType struct {
-	SessionId string `json:"sessionid"`
-	Name      string `json:"name"`
-	DeletedTs int64  `json:"deletedts"`
-}
-
-func (SessionTombstoneType) UseDBMap() {}
-
-func (SessionTombstoneType) GetType() string {
-	return "sessiontombstone"
-}
-
-type SessionStatsType struct {
-	SessionId          string              `json:"sessionid"`
-	NumScreens         int                 `json:"numscreens"`
-	NumArchivedScreens int                 `json:"numarchivedscreens"`
-	NumLines           int                 `json:"numlines"`
-	NumCmds            int                 `json:"numcmds"`
-	DiskStats          SessionDiskSizeType `json:"diskstats"`
-}
-
-type ScreenOptsType struct {
-	TabColor string `json:"tabcolor,omitempty"`
-	TabIcon  string `json:"tabicon,omitempty"`
-	PTerm    string `json:"pterm,omitempty"`
-}
-
-type ScreenLinesType struct {
-	ScreenId string      `json:"screenid"`
-	Lines    []*LineType `json:"lines" dbmap:"-"`
-	Cmds     []*CmdType  `json:"cmds" dbmap:"-"`
-}
-
-func (ScreenLinesType) UseDBMap() {}
-
-func (ScreenLinesType) GetType() string {
-	return "screenlines"
-}
-
-type ScreenWebShareOpts struct {
-	ShareName string `json:"sharename"`
-	ViewKey   string `json:"viewkey"`
-}
-
-type ScreenCreateOpts struct {
-	BaseScreenId string
-	CopyRemote   bool
-	CopyCwd      bool
-	CopyEnv      bool
-}
-
-func (sco ScreenCreateOpts) HasCopy() bool {
-	return sco.CopyRemote || sco.CopyCwd || sco.CopyEnv
-}
-
-type ScreenSidebarOptsType struct {
-	Open  bool   `json:"open,omitempty"`
-	Width string `json:"width,omitempty"`
-
-	// this used to be more complicated (sections with types).  simplified for this release
-	SidebarLineId string `json:"sidebarlineid,omitempty"`
-}
-
-type ScreenViewOptsType struct {
-	Sidebar *ScreenSidebarOptsType `json:"sidebar,omitempty"`
-}
-
-type ScreenType struct {
-	SessionId      string              `json:"sessionid"`
-	ScreenId       string              `json:"screenid"`
-	Name           string              `json:"name"`
-	ScreenIdx      int64               `json:"screenidx"`
-	ScreenOpts     ScreenOptsType      `json:"screenopts"`
-	ScreenViewOpts ScreenViewOptsType  `json:"screenviewopts"`
-	OwnerId        string              `json:"ownerid"`
-	ShareMode      string              `json:"sharemode"`
-	WebShareOpts   *ScreenWebShareOpts `json:"webshareopts,omitempty"`
-	CurRemote      RemotePtrType       `json:"curremote"`
-	NextLineNum    int64               `json:"nextlinenum"`
-	SelectedLine   int64               `json:"selectedline"`
-	Anchor         ScreenAnchorType    `json:"anchor"`
-	FocusType      string              `json:"focustype"`
-	Archived       bool                `json:"archived,omitempty"`
-	ArchivedTs     int64               `json:"archivedts,omitempty"`
-
-	// only for updates
-	Remove bool `json:"remove,omitempty"`
-}
-
-func (s *ScreenType) ToMap() map[string]interface{} {
-	rtn := make(map[string]interface{})
-	rtn["sessionid"] = s.SessionId
-	rtn["screenid"] = s.ScreenId
-	rtn["name"] = s.Name
-	rtn["screenidx"] = s.ScreenIdx
-	rtn["screenopts"] = quickJson(s.ScreenOpts)
-	rtn["screenviewopts"] = quickJson(s.ScreenViewOpts)
-	rtn["ownerid"] = s.OwnerId
-	rtn["sharemode"] = s.ShareMode
-	rtn["webshareopts"] = quickNullableJson(s.WebShareOpts)
-	rtn["curremoteownerid"] = s.CurRemote.OwnerId
-	rtn["curremoteid"] = s.CurRemote.RemoteId
-	rtn["curremotename"] = s.CurRemote.Name
-	rtn["nextlinenum"] = s.NextLineNum
-	rtn["selectedline"] = s.SelectedLine
-	rtn["anchor"] = quickJson(s.Anchor)
-	rtn["focustype"] = s.FocusType
-	rtn["archived"] = s.Archived
-	rtn["archivedts"] = s.ArchivedTs
-	return rtn
-}
-
-func (s *ScreenType) FromMap(m map[string]interface{}) bool {
-	quickSetStr(&s.SessionId, m, "sessionid")
-	quickSetStr(&s.ScreenId, m, "screenid")
-	quickSetStr(&s.Name, m, "name")
-	quickSetInt64(&s.ScreenIdx, m, "screenidx")
-	quickSetJson(&s.ScreenOpts, m, "screenopts")
-	quickSetJson(&s.ScreenViewOpts, m, "screenviewopts")
-	quickSetStr(&s.OwnerId, m, "ownerid")
-	quickSetStr(&s.ShareMode, m, "sharemode")
-	quickSetNullableJson(&s.WebShareOpts, m, "webshareopts")
-	quickSetStr(&s.CurRemote.OwnerId, m, "curremoteownerid")
-	quickSetStr(&s.CurRemote.RemoteId, m, "curremoteid")
-	quickSetStr(&s.CurRemote.Name, m, "curremotename")
-	quickSetInt64(&s.NextLineNum, m, "nextlinenum")
-	quickSetInt64(&s.SelectedLine, m, "selectedline")
-	quickSetJson(&s.Anchor, m, "anchor")
-	quickSetStr(&s.FocusType, m, "focustype")
-	quickSetBool(&s.Archived, m, "archived")
-	quickSetInt64(&s.ArchivedTs, m, "archivedts")
-	return true
-}
-
-func (ScreenType) GetType() string {
-	return "screen"
-}
-
-func AddScreenUpdate(update *scbus.ModelUpdatePacketType, newScreen *ScreenType) {
-	if newScreen == nil {
-		return
-	}
-	screenUpdates := scbus.GetUpdateItems[ScreenType](update)
-	for _, screenUpdate := range screenUpdates {
-		if screenUpdate.ScreenId == newScreen.ScreenId {
-			screenUpdate = newScreen
-			return
-		}
-	}
-	update.AddUpdate(newScreen)
-}
-
-type ScreenTombstoneType struct {
-	ScreenId   string         `json:"screenid"`
-	SessionId  string         `json:"sessionid"`
-	Name       string         `json:"name"`
-	DeletedTs  int64          `json:"deletedts"`
-	ScreenOpts ScreenOptsType `json:"screenopts"`
-}
-
-func (ScreenTombstoneType) UseDBMap() {}
-
-func (ScreenTombstoneType) GetType() string {
-	return "screentombstone"
-}
-
 const (
 	LayoutFull = "full"
 )
@@ -515,11 +318,6 @@ func (l *LayoutType) Scan(val interface{}) error {
 
 func (l LayoutType) Value() (driver.Value, error) {
 	return quickValueJson(l)
-}
-
-type ScreenAnchorType struct {
-	AnchorLine   int `json:"anchorline,omitempty"`
-	AnchorOffset int `json:"anchoroffset,omitempty"`
 }
 
 type TermOpts struct {
@@ -653,16 +451,6 @@ func (ri *RemoteInstance) ToMap() map[string]interface{} {
 	rtn["shelltype"] = ri.ShellType
 	return rtn
 }
-
-type ScreenUpdateType struct {
-	UpdateId   int64  `json:"updateid"`
-	ScreenId   string `json:"screenid"`
-	LineId     string `json:"lineid"`
-	UpdateType string `json:"updatetype"`
-	UpdateTs   int64  `json:"updatets"`
-}
-
-func (ScreenUpdateType) UseDBMap() {}
 
 type LineType struct {
 	ScreenId      string         `json:"screenid"`

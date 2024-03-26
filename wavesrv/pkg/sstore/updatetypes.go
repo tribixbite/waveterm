@@ -11,12 +11,6 @@ import (
 	"github.com/wavetermdev/waveterm/wavesrv/pkg/scbus"
 )
 
-type ActiveSessionIdUpdate string
-
-func (ActiveSessionIdUpdate) GetType() string {
-	return "activesessionid"
-}
-
 type LineUpdate struct {
 	Line LineType `json:"line"`
 	Cmd  CmdType  `json:"cmd,omitempty"`
@@ -95,19 +89,6 @@ type InteractiveUpdate bool
 
 func (InteractiveUpdate) GetType() string {
 	return "interactive"
-}
-
-type ConnectUpdate struct {
-	Sessions                 []*SessionType                  `json:"sessions,omitempty"`
-	Screens                  []*ScreenType                   `json:"screens,omitempty"`
-	Remotes                  []*RemoteRuntimeState           `json:"remotes,omitempty"`
-	ScreenStatusIndicators   []*ScreenStatusIndicatorType    `json:"screenstatusindicators,omitempty"`
-	ScreenNumRunningCommands []*ScreenNumRunningCommandsType `json:"screennumrunningcommands,omitempty"`
-	ActiveSessionId          string                          `json:"activesessionid,omitempty"`
-}
-
-func (ConnectUpdate) GetType() string {
-	return "connect"
 }
 
 type RemoteEditType struct {

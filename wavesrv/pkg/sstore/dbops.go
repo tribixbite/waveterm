@@ -231,227 +231,6 @@ func UpdateRemoteStateVars(ctx context.Context, remoteId string, stateVars map[s
 	})
 }
 
-// includes archived sessions
-func GetBareSessions(ctx context.Context) ([]*SessionType, error) {
-	var rtn []*SessionType
-	err := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT * FROM session ORDER BY archived, sessionidx, archivedts`
-		tx.Select(&rtn, query)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return rtn, nil
-}
-
-// does not include archived, finds lowest sessionidx (for resetting active session)
-func GetFirstSessionId(ctx context.Context) (string, error) {
-	var rtn []string
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT sessionid from session WHERE NOT archived ORDER by sessionidx`
-		rtn = tx.SelectStrings(query)
-		return nil
-	})
-	if txErr != nil {
-		return "", txErr
-	}
-	if len(rtn) == 0 {
-		return "", nil
-	}
-	return rtn[0], nil
-}
-
-func GetBareSessionById(ctx context.Context, sessionId string) (*SessionType, error) {
-	var rtn SessionType
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT * FROM session WHERE sessionid = ?`
-		tx.Get(&rtn, query, sessionId)
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	if rtn.SessionId == "" {
-		return nil, nil
-	}
-	return &rtn, nil
-}
-
-const getAllSessionsQuery = `SELECT * FROM session ORDER BY archived, sessionidx, archivedts`
-
-// Gets all sessions, including archived
-func GetAllSessions(ctx context.Context) ([]*SessionType, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) ([]*SessionType, error) {
-		rtn := []*SessionType{}
-		tx.Select(&rtn, getAllSessionsQuery)
-		return rtn, nil
-	})
-}
-
-// Get all sessions and screens, including remotes
-func GetConnectUpdate(ctx context.Context) (*ConnectUpdate, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) (*ConnectUpdate, error) {
-		update := &ConnectUpdate{}
-		sessions := []*SessionType{}
-		tx.Select(&sessions, getAllSessionsQuery)
-		sessionMap := make(map[string]*SessionType)
-		for _, session := range sessions {
-			sessionMap[session.SessionId] = session
-			update.Sessions = append(update.Sessions, session)
-		}
-		query := `SELECT * FROM screen ORDER BY archived, screenidx, archivedts`
-		screens := dbutil.SelectMapsGen[*ScreenType](tx, query)
-		for _, screen := range screens {
-			update.Screens = append(update.Screens, screen)
-		}
-		query = `SELECT * FROM remote_instance`
-		riArr := dbutil.SelectMapsGen[*RemoteInstance](tx, query)
-		for _, ri := range riArr {
-			s := sessionMap[ri.SessionId]
-			if s != nil {
-				s.Remotes = append(s.Remotes, ri)
-			}
-		}
-		query = `SELECT activesessionid FROM client`
-		update.ActiveSessionId = tx.GetString(query)
-		return update, nil
-	})
-}
-
-func GetScreenLinesById(ctx context.Context, screenId string) (*ScreenLinesType, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) (*ScreenLinesType, error) {
-		query := `SELECT screenid FROM screen WHERE screenid = ?`
-		screen := dbutil.GetMappable[*ScreenLinesType](tx, query, screenId)
-		if screen == nil {
-			return nil, nil
-		}
-		query = `SELECT * FROM line WHERE screenid = ? ORDER BY linenum`
-		screen.Lines = dbutil.SelectMappable[*LineType](tx, query, screen.ScreenId)
-		query = `SELECT * FROM cmd WHERE screenid = ?`
-		screen.Cmds = dbutil.SelectMapsGen[*CmdType](tx, query, screen.ScreenId)
-		return screen, nil
-	})
-}
-
-// includes archived screens
-func GetSessionScreens(ctx context.Context, sessionId string) ([]*ScreenType, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) ([]*ScreenType, error) {
-		query := `SELECT * FROM screen WHERE sessionid = ? ORDER BY archived, screenidx, archivedts`
-		rtn := dbutil.SelectMapsGen[*ScreenType](tx, query, sessionId)
-		return rtn, nil
-	})
-}
-
-func GetSessionById(ctx context.Context, id string) (*SessionType, error) {
-	allSessions, err := GetAllSessions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, session := range allSessions {
-		if session.SessionId == id {
-			return session, nil
-		}
-	}
-	return nil, nil
-}
-
-// counts non-archived sessions
-func GetSessionCount(ctx context.Context) (int, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) (int, error) {
-		query := `SELECT COALESCE(count(*), 0) FROM session WHERE NOT archived`
-		numSessions := tx.GetInt(query)
-		return numSessions, nil
-	})
-}
-
-func GetSessionByName(ctx context.Context, name string) (*SessionType, error) {
-	var session *SessionType
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT sessionid FROM session WHERE name = ?`
-		sessionId := tx.GetString(query, name)
-		if sessionId == "" {
-			return nil
-		}
-		var err error
-		session, err = GetSessionById(tx.Context(), sessionId)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	return session, nil
-}
-
-// returns sessionId
-// if sessionName == "", it will be generated
-func InsertSessionWithName(ctx context.Context, sessionName string, activate bool) (*scbus.ModelUpdatePacketType, error) {
-	var newScreen *ScreenType
-	newSessionId := scbase.GenWaveUUID()
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		names := tx.SelectStrings(`SELECT name FROM session`)
-		sessionName = fmtUniqueName(sessionName, "workspace-%d", len(names)+1, names)
-		maxSessionIdx := tx.GetInt(`SELECT COALESCE(max(sessionidx), 0) FROM session`)
-		query := `INSERT INTO session (sessionid, name, activescreenid, sessionidx, notifynum, archived, archivedts, sharemode)
-                               VALUES (?,         ?,    '',             ?,          0,         0,        0,          ?)`
-		tx.Exec(query, newSessionId, sessionName, maxSessionIdx+1, ShareModeLocal)
-		screenUpdate, err := InsertScreen(tx.Context(), newSessionId, "", ScreenCreateOpts{}, true)
-		if err != nil {
-			return err
-		}
-		screenUpdateItems := scbus.GetUpdateItems[ScreenType](screenUpdate)
-		if len(screenUpdateItems) < 1 {
-			return fmt.Errorf("no screen update items")
-		}
-		newScreen = screenUpdateItems[0]
-		if activate {
-			query = `UPDATE client SET activesessionid = ?`
-			tx.Exec(query, newSessionId)
-		}
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	session, err := GetSessionById(ctx, newSessionId)
-	if err != nil {
-		return nil, err
-	}
-	update := scbus.MakeUpdatePacket()
-	update.AddUpdate(*session)
-	update.AddUpdate(*newScreen)
-	if activate {
-		update.AddUpdate(ActiveSessionIdUpdate(newSessionId))
-	}
-	return update, nil
-}
-
-func SetActiveSessionId(ctx context.Context, sessionId string) error {
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT sessionid FROM session WHERE sessionid = ?`
-		if !tx.Exists(query, sessionId) {
-			return fmt.Errorf("cannot switch to session, not found")
-		}
-		query = `UPDATE client SET activesessionid = ?`
-		tx.Exec(query, sessionId)
-		return nil
-	})
-	return txErr
-}
-
-func GetActiveSessionId(ctx context.Context) (string, error) {
-	var rtnId string
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT activesessionid FROM client`
-		rtnId = tx.GetString(query)
-		return nil
-	})
-	return rtnId, txErr
-}
-
 func SetWinSize(ctx context.Context, winSize ClientWinSizeType) error {
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE client SET winsize = ?`
@@ -488,7 +267,7 @@ func containsStr(strs []string, testStr string) bool {
 	return false
 }
 
-func fmtUniqueName(name string, defaultFmtStr string, startIdx int, strs []string) string {
+func FmtUniqueName(name string, defaultFmtStr string, startIdx int, strs []string) string {
 	var fmtStr string
 	if name != "" {
 		if !containsStr(strs, name) {
@@ -510,93 +289,6 @@ func fmtUniqueName(name string, defaultFmtStr string, startIdx int, strs []strin
 		}
 		return testName
 	}
-}
-
-func InsertScreen(ctx context.Context, sessionId string, origScreenName string, opts ScreenCreateOpts, activate bool) (*scbus.ModelUpdatePacketType, error) {
-	var newScreenId string
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT sessionid FROM session WHERE sessionid = ? AND NOT archived`
-		if !tx.Exists(query, sessionId) {
-			return fmt.Errorf("cannot create screen, no session found (or session archived)")
-		}
-		localRemoteId := tx.GetString(`SELECT remoteid FROM remote WHERE remotealias = ?`, LocalRemoteAlias)
-		if localRemoteId == "" {
-			return fmt.Errorf("cannot create screen, no local remote found")
-		}
-		maxScreenIdx := tx.GetInt(`SELECT COALESCE(max(screenidx), 0) FROM screen WHERE sessionid = ? AND NOT archived`, sessionId)
-		var screenName string
-		if origScreenName == "" {
-			screenNames := tx.SelectStrings(`SELECT name FROM screen WHERE sessionid = ? AND NOT archived`, sessionId)
-			screenName = fmtUniqueName("", "s%d", maxScreenIdx+1, screenNames)
-		} else {
-			screenName = origScreenName
-		}
-		var baseScreen *ScreenType
-		if opts.HasCopy() {
-			if opts.BaseScreenId == "" {
-				return fmt.Errorf("invalid screen create opts, copy option with no base screen specified")
-			}
-			var err error
-			baseScreen, err = GetScreenById(tx.Context(), opts.BaseScreenId)
-			if err != nil {
-				return err
-			}
-			if baseScreen == nil {
-				return fmt.Errorf("cannot create screen, base screen not found")
-			}
-		}
-		newScreenId = scbase.GenWaveUUID()
-		screen := &ScreenType{
-			SessionId:    sessionId,
-			ScreenId:     newScreenId,
-			Name:         screenName,
-			ScreenIdx:    int64(maxScreenIdx) + 1,
-			ScreenOpts:   ScreenOptsType{},
-			OwnerId:      "",
-			ShareMode:    ShareModeLocal,
-			CurRemote:    RemotePtrType{RemoteId: localRemoteId},
-			NextLineNum:  1,
-			SelectedLine: 0,
-			Anchor:       ScreenAnchorType{},
-			FocusType:    ScreenFocusInput,
-			Archived:     false,
-			ArchivedTs:   0,
-		}
-		query = `INSERT INTO screen ( sessionid, screenid, name, screenidx, screenopts, screenviewopts, ownerid, sharemode, webshareopts, curremoteownerid, curremoteid, curremotename, nextlinenum, selectedline, anchor, focustype, archived, archivedts)
-                             VALUES (:sessionid,:screenid,:name,:screenidx,:screenopts,:screenviewopts,:ownerid,:sharemode,:webshareopts,:curremoteownerid,:curremoteid,:curremotename,:nextlinenum,:selectedline,:anchor,:focustype,:archived,:archivedts)`
-		tx.NamedExec(query, screen.ToMap())
-		if activate {
-			query = `UPDATE session SET activescreenid = ? WHERE sessionid = ?`
-			tx.Exec(query, newScreenId, sessionId)
-		}
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	newScreen, err := GetScreenById(ctx, newScreenId)
-	if err != nil {
-		return nil, err
-	}
-	update := scbus.MakeUpdatePacket()
-	update.AddUpdate(*newScreen)
-	if activate {
-		bareSession, err := GetBareSessionById(ctx, sessionId)
-		if err != nil {
-			return nil, txErr
-		}
-		update.AddUpdate(*bareSession)
-		UpdateWithCurrentOpenAICmdInfoChat(newScreenId, update)
-	}
-	return update, nil
-}
-
-func GetScreenById(ctx context.Context, screenId string) (*ScreenType, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) (*ScreenType, error) {
-		query := `SELECT * FROM screen WHERE screenid = ?`
-		screen := dbutil.GetMapGen[*ScreenType](tx, query, screenId)
-		return screen, nil
-	})
 }
 
 // special "E" returns last unarchived line, "EA" returns last line (even if archived)
@@ -685,8 +377,8 @@ INSERT INTO cmd  ( screenid, lineid, remoteownerid, remoteid, remotename, cmdstr
 `
 			tx.NamedExec(query, cmdMap)
 		}
-		if isWebShare(tx, line.ScreenId) {
-			insertScreenLineUpdate(tx, line.ScreenId, line.LineId, UpdateType_LineNew)
+		if IsWebShare(tx, line.ScreenId) {
+			InsertScreenLineUpdate(tx, line.ScreenId, line.LineId, UpdateType_LineNew)
 		}
 		return nil
 	})
@@ -760,10 +452,10 @@ func UpdateCmdDoneInfo(ctx context.Context, update *scbus.ModelUpdatePacketType,
 		if err != nil {
 			return err
 		}
-		if isWebShare(tx, screenId) {
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdExitCode)
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdDurationMs)
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdStatus)
+		if IsWebShare(tx, screenId) {
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdExitCode)
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdDurationMs)
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdStatus)
 		}
 		return nil
 	})
@@ -799,8 +491,8 @@ func UpdateCmdRtnState(ctx context.Context, ck base.CommandKey, statePtr ShellSt
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE cmd SET rtnbasehash = ?, rtndiffhasharr = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, statePtr.BaseHash, quickJsonArr(statePtr.DiffHashArr), screenId, lineId)
-		if isWebShare(tx, screenId) {
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdRtnState)
+		if IsWebShare(tx, screenId) {
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdRtnState)
 		}
 		return nil
 	})
@@ -826,8 +518,8 @@ func HangupAllRunningCmds(ctx context.Context) error {
 		query = `UPDATE cmd SET status = ? WHERE status = ?`
 		tx.Exec(query, CmdStatusHangup, CmdStatusRunning)
 		for _, cmdPtr := range cmdPtrs {
-			if isWebShare(tx, cmdPtr.ScreenId) {
-				insertScreenLineUpdate(tx, cmdPtr.ScreenId, cmdPtr.LineId, UpdateType_CmdStatus)
+			if IsWebShare(tx, cmdPtr.ScreenId) {
+				InsertScreenLineUpdate(tx, cmdPtr.ScreenId, cmdPtr.LineId, UpdateType_CmdStatus)
 			}
 			query = `UPDATE history SET status = ? WHERE screenid = ? AND lineid = ?`
 			tx.Exec(query, CmdStatusHangup, cmdPtr.ScreenId, cmdPtr.LineId)
@@ -846,8 +538,8 @@ func HangupRunningCmdsByRemoteId(ctx context.Context, remoteId string) ([]*Scree
 		tx.Exec(query, CmdStatusHangup, CmdStatusRunning, remoteId)
 		var rtn []*ScreenType
 		for _, cmdPtr := range cmdPtrs {
-			if isWebShare(tx, cmdPtr.ScreenId) {
-				insertScreenLineUpdate(tx, cmdPtr.ScreenId, cmdPtr.LineId, UpdateType_CmdStatus)
+			if IsWebShare(tx, cmdPtr.ScreenId) {
+				InsertScreenLineUpdate(tx, cmdPtr.ScreenId, cmdPtr.LineId, UpdateType_CmdStatus)
 			}
 			query = `UPDATE history SET status = ? WHERE screenid = ? AND lineid = ?`
 			tx.Exec(query, CmdStatusHangup, cmdPtr.ScreenId, cmdPtr.LineId)
@@ -871,8 +563,8 @@ func HangupCmd(ctx context.Context, ck base.CommandKey) (*ScreenType, error) {
 		tx.Exec(query, CmdStatusHangup, ck.GetGroupId(), lineIdFromCK(ck))
 		query = `UPDATE history SET status = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, CmdStatusHangup, ck.GetGroupId(), lineIdFromCK(ck))
-		if isWebShare(tx, ck.GetGroupId()) {
-			insertScreenLineUpdate(tx, ck.GetGroupId(), lineIdFromCK(ck), UpdateType_CmdStatus)
+		if IsWebShare(tx, ck.GetGroupId()) {
+			InsertScreenLineUpdate(tx, ck.GetGroupId(), lineIdFromCK(ck), UpdateType_CmdStatus)
 		}
 		screen, err := UpdateScreenFocusForDoneCmd(tx.Context(), ck.GetGroupId(), lineIdFromCK(ck))
 		if err != nil {
@@ -904,200 +596,6 @@ func getNextId(ids []string, delId string) string {
 		}
 	}
 	return ids[0]
-}
-
-func SwitchScreenById(ctx context.Context, sessionId string, screenId string) (*scbus.ModelUpdatePacketType, error) {
-	SetActiveSessionId(ctx, sessionId)
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT screenid FROM screen WHERE sessionid = ? AND screenid = ?`
-		if !tx.Exists(query, sessionId, screenId) {
-			return fmt.Errorf("cannot switch to screen, screen=%s does not exist in session=%s", screenId, sessionId)
-		}
-		query = `UPDATE session SET activescreenid = ? WHERE sessionid = ?`
-		tx.Exec(query, screenId, sessionId)
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	bareSession, err := GetBareSessionById(ctx, sessionId)
-	if err != nil {
-		return nil, err
-	}
-	update := scbus.MakeUpdatePacket()
-	update.AddUpdate(ActiveSessionIdUpdate(sessionId))
-	update.AddUpdate(*bareSession)
-	memState := GetScreenMemState(screenId)
-	if memState != nil {
-		update.AddUpdate(CmdLineUpdate(memState.CmdInputText))
-		UpdateWithCurrentOpenAICmdInfoChat(screenId, update)
-
-		// Clear any previous status indicator for this screen
-		err := ResetStatusIndicator_Update(update, screenId)
-		if err != nil {
-			// This is not a fatal error, so just log it
-			log.Printf("error resetting status indicator when switching screens: %v\n", err)
-		}
-	}
-	return update, nil
-}
-
-// screen may not exist at this point (so don't query screen table)
-func cleanScreenCmds(ctx context.Context, screenId string) error {
-	var removedCmds []string
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT lineid FROM cmd WHERE screenid = ? AND lineid NOT IN (SELECT lineid FROM line WHERE screenid = ?)`
-		removedCmds = tx.SelectStrings(query, screenId, screenId)
-		query = `DELETE FROM cmd WHERE screenid = ? AND lineid NOT IN (SELECT lineid FROM line WHERE screenid = ?)`
-		tx.Exec(query, screenId, screenId)
-		return nil
-	})
-	if txErr != nil {
-		return txErr
-	}
-	for _, lineId := range removedCmds {
-		DeletePtyOutFile(ctx, screenId, lineId)
-	}
-	return nil
-}
-
-func ArchiveScreen(ctx context.Context, sessionId string, screenId string) (scbus.UpdatePacket, error) {
-	var isActive bool
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT screenid FROM screen WHERE sessionid = ? AND screenid = ?`
-		if !tx.Exists(query, sessionId, screenId) {
-			return fmt.Errorf("cannot close screen (not found)")
-		}
-		if isWebShare(tx, screenId) {
-			return fmt.Errorf("cannot archive screen while web-sharing.  stop web-sharing before trying to archive.")
-		}
-		query = `SELECT archived FROM screen WHERE sessionid = ? AND screenid = ?`
-		closeVal := tx.GetBool(query, sessionId, screenId)
-		if closeVal {
-			return nil
-		}
-		query = `SELECT count(*) FROM screen WHERE sessionid = ? AND NOT archived`
-		numScreens := tx.GetInt(query, sessionId)
-		if numScreens <= 1 {
-			return fmt.Errorf("cannot archive the last screen in a session")
-		}
-		query = `UPDATE screen SET archived = 1, archivedts = ?, screenidx = 0 WHERE sessionid = ? AND screenid = ?`
-		tx.Exec(query, time.Now().UnixMilli(), sessionId, screenId)
-		isActive = tx.Exists(`SELECT sessionid FROM session WHERE sessionid = ? AND activescreenid = ?`, sessionId, screenId)
-		if isActive {
-			screenIds := tx.SelectStrings(`SELECT screenid FROM screen WHERE sessionid = ? AND NOT archived ORDER BY screenidx`, sessionId)
-			nextId := getNextId(screenIds, screenId)
-			tx.Exec(`UPDATE session SET activescreenid = ? WHERE sessionid = ?`, nextId, sessionId)
-		}
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	newScreen, err := GetScreenById(ctx, screenId)
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrive archived screen: %w", err)
-	}
-	update := scbus.MakeUpdatePacket()
-	update.AddUpdate(*newScreen)
-	if isActive {
-		bareSession, err := GetBareSessionById(ctx, sessionId)
-		if err != nil {
-			return nil, err
-		}
-		update.AddUpdate(*bareSession)
-	}
-	return update, nil
-}
-
-func UnArchiveScreen(ctx context.Context, sessionId string, screenId string) error {
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT screenid FROM screen WHERE sessionid = ? AND screenid = ? AND archived`
-		if !tx.Exists(query, sessionId, screenId) {
-			return fmt.Errorf("cannot re-open screen (not found or not archived)")
-		}
-		maxScreenIdx := tx.GetInt(`SELECT COALESCE(max(screenidx), 0) FROM screen WHERE sessionid = ? AND NOT archived`, sessionId)
-		query = `UPDATE screen SET archived = 0, screenidx = ? WHERE sessionid = ? AND screenid = ?`
-		tx.Exec(query, maxScreenIdx+1, sessionId, screenId)
-		return nil
-	})
-	return txErr
-}
-
-// if sessionDel is passed, we do *not* delete the screen directory (session delete will handle that)
-func DeleteScreen(ctx context.Context, screenId string, sessionDel bool, update *scbus.ModelUpdatePacketType) (*scbus.ModelUpdatePacketType, error) {
-	var sessionId string
-	var isActive bool
-	var screenTombstone *ScreenTombstoneType
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		screen, err := GetScreenById(tx.Context(), screenId)
-		if err != nil {
-			return fmt.Errorf("cannot get screen to delete: %w", err)
-		}
-		if screen == nil {
-			return fmt.Errorf("cannot delete screen (not found)")
-		}
-		webSharing := isWebShare(tx, screenId)
-		if !sessionDel {
-			query := `SELECT sessionid FROM screen WHERE screenid = ?`
-			sessionId = tx.GetString(query, screenId)
-			if sessionId == "" {
-				return fmt.Errorf("cannot delete screen (no sessionid)")
-			}
-			query = `SELECT count(*) FROM screen WHERE sessionid = ? AND NOT archived`
-			numScreens := tx.GetInt(query, sessionId)
-			if numScreens <= 1 {
-				return fmt.Errorf("cannot delete the last screen in a session")
-			}
-			isActive = tx.Exists(`SELECT sessionid FROM session WHERE sessionid = ? AND activescreenid = ?`, sessionId, screenId)
-			if isActive {
-				screenIds := tx.SelectStrings(`SELECT screenid FROM screen WHERE sessionid = ? AND NOT archived ORDER BY screenidx`, sessionId)
-				nextId := getNextId(screenIds, screenId)
-				tx.Exec(`UPDATE session SET activescreenid = ? WHERE sessionid = ?`, nextId, sessionId)
-			}
-		}
-		screenTombstone = &ScreenTombstoneType{
-			ScreenId:   screen.ScreenId,
-			SessionId:  screen.SessionId,
-			Name:       screen.Name,
-			DeletedTs:  time.Now().UnixMilli(),
-			ScreenOpts: screen.ScreenOpts,
-		}
-		query := `INSERT INTO screen_tombstone ( screenid, sessionid, name, deletedts, screenopts)
-		                                VALUES (:screenid,:sessionid,:name,:deletedts,:screenopts)`
-		tx.NamedExec(query, dbutil.ToDBMap(screenTombstone, false))
-		query = `DELETE FROM screen WHERE screenid = ?`
-		tx.Exec(query, screenId)
-		query = `DELETE FROM line WHERE screenid = ?`
-		tx.Exec(query, screenId)
-		query = `DELETE FROM cmd WHERE screenid = ?`
-		tx.Exec(query, screenId)
-		query = `UPDATE history SET lineid = '', linenum = 0 WHERE screenid = ?`
-		tx.Exec(query, screenId)
-		if webSharing {
-			insertScreenDelUpdate(tx, screenId)
-		}
-		return nil
-	})
-	if txErr != nil {
-		return nil, txErr
-	}
-	if !sessionDel {
-		GoDeleteScreenDirs(screenId)
-	}
-	if update == nil {
-		update = scbus.MakeUpdatePacket()
-	}
-	update.AddUpdate(*screenTombstone)
-	update.AddUpdate(ScreenType{SessionId: sessionId, ScreenId: screenId, Remove: true})
-	if isActive {
-		bareSession, err := GetBareSessionById(ctx, sessionId)
-		if err != nil {
-			return nil, err
-		}
-		update.AddUpdate(*bareSession)
-	}
-	return update, nil
 }
 
 func GetRemoteState(ctx context.Context, sessionId string, screenId string, remotePtr RemotePtrType) (*packet.ShellState, *ShellStatePtr, error) {
@@ -1412,7 +910,7 @@ func UpdateCmdTermOpts(ctx context.Context, screenId string, lineId string, term
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE cmd SET termopts = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, termOpts, screenId, lineId)
-		insertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdTermOpts)
+		InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_CmdTermOpts)
 		return nil
 	})
 	return txErr
@@ -1696,7 +1194,7 @@ func UpdateScreen(ctx context.Context, screenId string, editMap map[string]inter
 		if sline, found := editMap[ScreenField_SelectedLine]; found {
 			query = `UPDATE screen SET selectedline = ? WHERE screenid = ?`
 			tx.Exec(query, sline, screenId)
-			if isWebShare(tx, screenId) {
+			if IsWebShare(tx, screenId) {
 				insertScreenUpdate(tx, screenId, UpdateType_ScreenSelectedLine)
 			}
 		}
@@ -1721,7 +1219,7 @@ func UpdateScreen(ctx context.Context, screenId string, editMap map[string]inter
 			tx.Exec(query, name, screenId)
 		}
 		if shareName, found := editMap[ScreenField_ShareName]; found {
-			if !isWebShare(tx, screenId) {
+			if !IsWebShare(tx, screenId) {
 				return fmt.Errorf("cannot set sharename, screen is not web-shared")
 			}
 			query = `UPDATE screen SET webshareopts = json_set(webshareopts, '$.sharename', ?) WHERE screenid = ?`
@@ -1961,8 +1459,8 @@ func UpdateLineHeight(ctx context.Context, screenId string, lineId string, heigh
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE line SET contentheight = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, heightVal, screenId, lineId)
-		if isWebShare(tx, screenId) {
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineContentHeight)
+		if IsWebShare(tx, screenId) {
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineContentHeight)
 		}
 		return nil
 	})
@@ -1976,8 +1474,8 @@ func UpdateLineRenderer(ctx context.Context, screenId string, lineId string, ren
 	return WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE line SET renderer = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, renderer, screenId, lineId)
-		if isWebShare(tx, screenId) {
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineRenderer)
+		if IsWebShare(tx, screenId) {
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineRenderer)
 		}
 		return nil
 	})
@@ -1991,8 +1489,8 @@ func UpdateLineState(ctx context.Context, screenId string, lineId string, lineSt
 	return WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE line SET linestate = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, qjs, screenId, lineId)
-		if isWebShare(tx, screenId) {
-			insertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineState)
+		if IsWebShare(tx, screenId) {
+			InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineState)
 		}
 		return nil
 	})
@@ -2011,11 +1509,11 @@ func SetLineArchivedById(ctx context.Context, screenId string, lineId string, ar
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `UPDATE line SET archived = ? WHERE screenid = ? AND lineid = ?`
 		tx.Exec(query, archived, screenId, lineId)
-		if isWebShare(tx, screenId) {
+		if IsWebShare(tx, screenId) {
 			if archived {
-				insertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineDel)
+				InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineDel)
 			} else {
-				insertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineNew)
+				InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineNew)
 			}
 		}
 		return nil
@@ -2061,7 +1559,7 @@ func FixupScreenSelectedLine(ctx context.Context, screenId string) (*ScreenType,
 
 func DeleteLinesByIds(ctx context.Context, screenId string, lineIds []string) error {
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		isWS := isWebShare(tx, screenId)
+		isWS := IsWebShare(tx, screenId)
 		for _, lineId := range lineIds {
 			query := `SELECT status FROM cmd WHERE screenid = ? AND lineid = ?`
 			cmdStatus := tx.GetString(query, screenId, lineId)
@@ -2076,7 +1574,7 @@ func DeleteLinesByIds(ctx context.Context, screenId string, lineIds []string) er
 			query = `UPDATE history SET lineid = '', linenum = 0 WHERE screenid = ? AND lineid = ?`
 			tx.Exec(query, screenId, lineId)
 			if isWS {
-				insertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineDel)
+				InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_LineDel)
 			}
 		}
 		return nil
@@ -2210,84 +1708,48 @@ func CountScreenLines(ctx context.Context, screenId string) (int, error) {
 // 	return nil
 // }
 
-func ScreenWebShareStart(ctx context.Context, screenId string, shareOpts ScreenWebShareOpts) error {
-	return WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT screenid FROM screen WHERE screenid = ?`
-		if !tx.Exists(query, screenId) {
-			return fmt.Errorf("screen does not exist")
-		}
-		shareMode := tx.GetString(`SELECT sharemode FROM screen WHERE screenid = ?`, screenId)
-		if shareMode == ShareModeWeb {
-			return fmt.Errorf("screen is already shared to web")
-		}
-		if shareMode != ShareModeLocal {
-			return fmt.Errorf("screen cannot be shared, invalid current share mode %q (must be local)", shareMode)
-		}
-		query = `UPDATE screen SET sharemode = ?, webshareopts = ? WHERE screenid = ?`
-		tx.Exec(query, ShareModeWeb, quickJson(shareOpts), screenId)
-		insertScreenNewUpdate(tx, screenId)
-		return nil
-	})
-}
+// func ScreenWebShareStart(ctx context.Context, screenId string, shareOpts ScreenWebShareOpts) error {
+// 	return WithTx(ctx, func(tx *TxWrap) error {
+// 		query := `SELECT screenid FROM screen WHERE screenid = ?`
+// 		if !tx.Exists(query, screenId) {
+// 			return fmt.Errorf("screen does not exist")
+// 		}
+// 		shareMode := tx.GetString(`SELECT sharemode FROM screen WHERE screenid = ?`, screenId)
+// 		if shareMode == ShareModeWeb {
+// 			return fmt.Errorf("screen is already shared to web")
+// 		}
+// 		if shareMode != ShareModeLocal {
+// 			return fmt.Errorf("screen cannot be shared, invalid current share mode %q (must be local)", shareMode)
+// 		}
+// 		query = `UPDATE screen SET sharemode = ?, webshareopts = ? WHERE screenid = ?`
+// 		tx.Exec(query, ShareModeWeb, quickJson(shareOpts), screenId)
+// 		insertScreenNewUpdate(tx, screenId)
+// 		return nil
+// 	})
+// }
 
-func ScreenWebShareStop(ctx context.Context, screenId string) error {
-	return WithTx(ctx, func(tx *TxWrap) error {
-		query := `SELECT screenid FROM screen WHERE screenid = ?`
-		if !tx.Exists(query, screenId) {
-			return fmt.Errorf("screen does not exist")
-		}
-		shareMode := tx.GetString(`SELECT sharemode FROM screen WHERE screenid = ?`, screenId)
-		if shareMode != ShareModeWeb {
-			return fmt.Errorf("screen is not currently shared to the web")
-		}
-		query = `UPDATE screen SET sharemode = ?, webshareopts = ? WHERE screenid = ?`
-		tx.Exec(query, ShareModeLocal, "null", screenId)
-		handleScreenDelUpdate(tx, screenId)
-		return nil
-	})
-}
+// func ScreenWebShareStop(ctx context.Context, screenId string) error {
+// 	return WithTx(ctx, func(tx *TxWrap) error {
+// 		query := `SELECT screenid FROM screen WHERE screenid = ?`
+// 		if !tx.Exists(query, screenId) {
+// 			return fmt.Errorf("screen does not exist")
+// 		}
+// 		shareMode := tx.GetString(`SELECT sharemode FROM screen WHERE screenid = ?`, screenId)
+// 		if shareMode != ShareModeWeb {
+// 			return fmt.Errorf("screen is not currently shared to the web")
+// 		}
+// 		query = `UPDATE screen SET sharemode = ?, webshareopts = ? WHERE screenid = ?`
+// 		tx.Exec(query, ShareModeLocal, "null", screenId)
+// 		handleScreenDelUpdate(tx, screenId)
+// 		return nil
+// 	})
+// }
 
-func isWebShare(tx *TxWrap, screenId string) bool {
+func IsWebShare(tx *TxWrap, screenId string) bool {
 	return tx.Exists(`SELECT screenid FROM screen WHERE screenid = ? AND sharemode = ?`, screenId, ShareModeWeb)
 }
 
-func insertScreenUpdate(tx *TxWrap, screenId string, updateType string) {
-	if screenId == "" {
-		tx.SetErr(errors.New("invalid screen-update, screenid is empty"))
-		return
-	}
-	nowTs := time.Now().UnixMilli()
-	query := `INSERT INTO screenupdate (screenid, lineid, updatetype, updatets) VALUES (?, ?, ?, ?)`
-	tx.Exec(query, screenId, "", updateType, nowTs)
-	NotifyUpdateWriter()
-}
-
-func insertScreenNewUpdate(tx *TxWrap, screenId string) {
-	nowTs := time.Now().UnixMilli()
-	query := `INSERT INTO screenupdate (screenid, lineid, updatetype, updatets)
-              SELECT screenid, lineid, ?, ? FROM line WHERE screenid = ? AND NOT archived ORDER BY linenum DESC`
-	tx.Exec(query, UpdateType_LineNew, nowTs, screenId)
-	query = `INSERT INTO screenupdate (screenid, lineid, updatetype, updatets)
-             SELECT c.screenid, c.lineid, ?, ? FROM cmd c, line l WHERE c.screenid = ? AND l.lineid = c.lineid AND NOT l.archived ORDER BY l.linenum DESC`
-	tx.Exec(query, UpdateType_PtyPos, nowTs, screenId)
-	NotifyUpdateWriter()
-}
-
-func handleScreenDelUpdate(tx *TxWrap, screenId string) {
-	query := `DELETE FROM screenupdate WHERE screenid = ?`
-	tx.Exec(query, screenId)
-	query = `DELETE FROM webptypos WHERE screenid = ?`
-	tx.Exec(query, screenId)
-	// don't insert UpdateType_ScreenDel (we already processed it in cmdrunner)
-}
-
-func insertScreenDelUpdate(tx *TxWrap, screenId string) {
-	handleScreenDelUpdate(tx, screenId)
-	insertScreenUpdate(tx, screenId, UpdateType_ScreenDel)
-	// don't insert UpdateType_ScreenDel (we already processed it in cmdrunner)
-}
-
-func insertScreenLineUpdate(tx *TxWrap, screenId string, lineId string, updateType string) {
+func InsertScreenLineUpdate(tx *TxWrap, screenId string, lineId string, updateType string) {
 	if screenId == "" {
 		tx.SetErr(errors.New("invalid screen-update, screenid is empty"))
 		return
@@ -2308,47 +1770,12 @@ func insertScreenLineUpdate(tx *TxWrap, screenId string, lineId string, updateTy
 	NotifyUpdateWriter()
 }
 
-func GetScreenUpdates(ctx context.Context, maxNum int) ([]*ScreenUpdateType, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) ([]*ScreenUpdateType, error) {
-		var updates []*ScreenUpdateType
-		query := `SELECT * FROM screenupdate ORDER BY updateid LIMIT ?`
-		tx.Select(&updates, query, maxNum)
-		return updates, nil
-	})
-}
-
-func RemoveScreenUpdate(ctx context.Context, updateId int64) error {
-	if updateId < 0 {
-		return nil // in-memory updates (not from DB)
-	}
-	return WithTx(ctx, func(tx *TxWrap) error {
-		query := `DELETE FROM screenupdate WHERE updateid = ?`
-		tx.Exec(query, updateId)
-		return nil
-	})
-}
-
-func CountScreenUpdates(ctx context.Context) (int, error) {
-	return WithTxRtn(ctx, func(tx *TxWrap) (int, error) {
-		query := `SELECT count(*) FROM screenupdate`
-		return tx.GetInt(query), nil
-	})
-}
-
-func RemoveScreenUpdates(ctx context.Context, updateIds []int64) error {
-	return WithTx(ctx, func(tx *TxWrap) error {
-		query := `DELETE FROM screenupdate WHERE updateid IN (SELECT value FROM json_each(?))`
-		tx.Exec(query, quickJsonArr(updateIds))
-		return nil
-	})
-}
-
 func MaybeInsertPtyPosUpdate(ctx context.Context, screenId string, lineId string) error {
 	return WithTx(ctx, func(tx *TxWrap) error {
-		if !isWebShare(tx, screenId) {
+		if !IsWebShare(tx, screenId) {
 			return nil
 		}
-		insertScreenLineUpdate(tx, screenId, lineId, UpdateType_PtyPos)
+		InsertScreenLineUpdate(tx, screenId, lineId, UpdateType_PtyPos)
 		return nil
 	})
 }
