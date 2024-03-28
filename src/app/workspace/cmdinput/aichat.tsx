@@ -113,19 +113,21 @@ class AIChat extends React.Component<{}, {}> {
         mobx.action(() => {
             this.isFocused.set(true);
         })();
+        GlobalModel.inputModel.codeSelectDeselectAndClear();
     }
 
     onTextAreaBlur(e: any) {
         mobx.action(() => {
             this.isFocused.set(false);
         })();
+        GlobalModel.inputModel.codeSelectDeselectAndClear();
     }
 
     onTextAreaChange(e: any) {
         // set height of textarea based on number of newlines
         mobx.action(() => {
             this.textAreaNumLines.set(e.target.value.split(/\n/).length);
-            GlobalModel.inputModel.codeSelectDeselectAll();
+            GlobalModel.inputModel.codeSelectDeselectAndClear();
         })();
     }
 
@@ -150,7 +152,7 @@ class AIChat extends React.Component<{}, {}> {
             return;
         }
         currentRef.setRangeText("\n", currentRef.selectionStart, currentRef.selectionEnd, "end");
-        GlobalModel.inputModel.codeSelectDeselectAll();
+        GlobalModel.inputModel.codeSelectDeselectAndClear();
     }
 
     onArrowUpPressed(): boolean {
@@ -160,7 +162,7 @@ class AIChat extends React.Component<{}, {}> {
         }
         if (this.getLinePos(currentRef).linePos > 1) {
             // normal up arrow
-            GlobalModel.inputModel.codeSelectDeselectAll();
+            GlobalModel.inputModel.codeSelectDeselectAndClear();
             return false;
         }
         GlobalModel.inputModel.codeSelectSelectNextOldestCodeBlock();

@@ -582,7 +582,7 @@ class InputModel {
             }
             let incBlockIndex = this.codeSelectSelectedIndex.get() + 1;
             if (this.codeSelectSelectedIndex.get() == this.codeSelectBlockRefArray.length - 1) {
-                this.codeSelectDeselectAll();
+                this.codeSelectDeselectAndClear();
                 if (this.aiChatWindowRef?.current != null) {
                     this.aiChatWindowRef.current.scrollTop = this.aiChatWindowRef.current.scrollHeight;
                 }
@@ -606,7 +606,7 @@ class InputModel {
             }
             let decBlockIndex = this.codeSelectSelectedIndex.get() - 1;
             if (decBlockIndex < 0) {
-                this.codeSelectDeselectAll(this.codeSelectTop);
+                this.codeSelectDeselectAndClear(this.codeSelectTop);
                 if (this.aiChatWindowRef?.current != null) {
                     this.aiChatWindowRef.current.scrollTop = 0;
                 }
@@ -629,13 +629,16 @@ class InputModel {
         return blockIndex == this.codeSelectSelectedIndex.get();
     }
 
-    codeSelectDeselectAll(direction: number = this.codeSelectBottom) {
-        if (this.codeSelectSelectedIndex.get() == direction) {
-            return;
-        }
+    codeSelectDeselectAndClear(direction: number = this.codeSelectBottom) {
         mobx.action(() => {
             this.codeSelectSelectedIndex.set(direction);
             this.codeSelectBlockRefArray = [];
+        })();
+    }
+
+    codeSelectDeselectAll(direction: number = this.codeSelectBottom) {
+        mobx.action(() => {
+            this.codeSelectSelectedIndex.set(direction);
         })();
     }
 
