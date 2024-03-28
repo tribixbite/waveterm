@@ -25,6 +25,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
     const [selDate, setSelDate] = useState(dayjs(selectedDate)); // Initialize with dayjs object
     const [showYearAccordion, setShowYearAccordion] = useState(false);
     const [expandedYear, setExpandedYear] = useState<number | null>(selDate.year());
+    const [selectionTimeoutId, setSelectionTimeoutId] = useState<string | number | NodeJS.Timeout | null>(null);
     const yearRefs = useRef<YearRefs>({});
     const wrapperRef = useRef<HTMLDivElement>(null);
     const modalRef = useRef<HTMLDivElement>(null);
@@ -301,14 +302,18 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
         : null;
 
     const handleDatePartChange = (part: string, value: string) => {
+        console.log("Date part changed: ", part, value);
         const newDateParts = { ...dateParts, [part]: value };
-        setDateParts(newDateParts);
-
+        console.log("New date parts: ", newDateParts);
         // Construct a new date from the updated parts
         const newDate = dayjs(`${newDateParts.YYYY}-${newDateParts.MM}-${newDateParts.DD}`);
         if (newDate.isValid()) {
-            onSelectDate(newDate.toDate()); // Call onSelectDate with the new date
+            setSelDate(newDate); // Update selDate with the new dayjs object
+        } else {
+            console.log("Invalid date");
+            setSelDate(dayjs(new Date()));
         }
+        onSelectDate(selDate.toDate()); // Call onSelectDate with the new date
     };
 
     const handleArrowNavigation = (key: string, currentPart: string) => {
@@ -316,10 +321,32 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
         const currentIndex = formatParts.indexOf(currentPart);
         let targetInput;
 
+        const incrementInput = (part: string, increment: number) => {
+            let newValue = parseInt(dateParts[part]) + increment;
+            switch (part) {
+                case "MM":
+                    newValue = newValue > 12 ? 1 : newValue < 1 ? 12 : newValue;
+                    break;
+                case "DD":
+                    const daysInMonth = dayjs(selDate).daysInMonth();
+                    console.log("Days in month: ", daysInMonth);
+                    newValue = newValue > daysInMonth ? 1 : newValue < 1 ? daysInMonth : newValue;
+                    break;
+                case "YYYY":
+                    // No bounds for year
+                    break;
+            }
+            handleDatePartChange(part, newValue.toString());
+        };
+
         if (key == "ArrowLeft" && currentIndex > 0) {
             targetInput = inputRefs.current[formatParts[currentIndex - 1]].current;
         } else if (key == "ArrowRight" && currentIndex < formatParts.length - 1) {
             targetInput = inputRefs.current[formatParts[currentIndex + 1]].current;
+        } else if (key == "ArrowUp") {
+            incrementInput(currentPart, 1);
+        } else if (key == "ArrowDown") {
+            incrementInput(currentPart, -1);
         }
 
         if (targetInput) {
@@ -351,6 +378,14 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
             handleArrowNavigation("ArrowRight", part);
             return true;
         });
+        keybindManager.registerKeybinding("control", domain, "generic:selectAbove", (_) => {
+            handleArrowNavigation("ArrowUp", part);
+            return true;
+        });
+        keybindManager.registerKeybinding("control", domain, "generic:selectBelow", (_) => {
+            handleArrowNavigation("ArrowDown", part);
+            return true;
+        });
         keybindManager.registerKeybinding("control", domain, "generic:space", (_) => {
             toggleModal();
             return true;
@@ -369,10 +404,10 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
         });
         for (let numpadKey = 0; numpadKey <= 9; numpadKey++) {
             keybindManager.registerKeybinding("control", domain, "generic:numpad-" + numpadKey.toString(), (_) => {
+                console.log("Numpad key pressed: ", numpadKey);
                 const currentPart = part;
                 const maxLength = currentPart === "YYYY" ? 4 : 2;
                 const newValue = event.target.value.length < maxLength ? event.target.value + numpadKey : numpadKey;
-                let selectionTimeoutId = null;
                 handleDatePartChange(currentPart, newValue);
 
                 // Clear any existing timeout
@@ -381,10 +416,12 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
                 }
 
                 // Re-focus and select the input after state update
-                selectionTimeoutId = setTimeout(() => {
-                    event.target.focus();
-                    event.target.select();
-                }, 0);
+                setSelectionTimeoutId(
+                    setTimeout(() => {
+                        event.target.focus();
+                        event.target.select();
+                    }, 0)
+                );
                 return true;
             });
         }
