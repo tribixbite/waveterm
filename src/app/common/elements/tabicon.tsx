@@ -1,11 +1,11 @@
 // Copyright 2024, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import { isBlank } from "@/util/util";
 import cn from "classnames";
 
-class TabIcon extends React.PureComponent<{ icon: string; color: string }> {
+class TabIcon extends PureComponent<{ icon: string; color: string }> {
     render() {
         let { icon, color } = this.props;
         let iconClass = "";

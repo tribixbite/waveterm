@@ -1,14 +1,14 @@
 // Copyright 2024, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-preact";
 
 import "./pdf.less";
 
 @mobxReact.observer
-class SimplePdfRenderer extends React.PureComponent<
+class SimplePdfRenderer extends PureComponent<
     { data: ExtBlob; context: RendererContext; opts: RendererOpts; savedHeight: number },
     {}
 > {

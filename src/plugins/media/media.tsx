@@ -1,7 +1,7 @@
 // Copyright 2024, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-preact";
 import * as util from "@/util/util";
@@ -10,7 +10,7 @@ import { GlobalModel } from "@/models";
 import "./media.less";
 
 @mobxReact.observer
-class SimpleMediaRenderer extends React.PureComponent<
+class SimpleMediaRenderer extends PureComponent<
     { data: ExtBlob; context: RendererContext; opts: RendererOpts; savedHeight: number; lineState: LineStateType },
     {}
 > {

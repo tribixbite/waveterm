@@ -1,16 +1,16 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { JSX, cloneElement } from "preact";
 import { boundMethod } from "autobind-decorator";
 
 import { TextField } from "./textfield";
 
 class NumberField extends TextField {
     @boundMethod
-    handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    handleInputChange(e: JSX.TargetedEvent) {
         const { required, onChange } = this.props;
-        const inputValue = e.target.value;
+        const inputValue = (e.target as HTMLInputElement).value;
 
         // Allow only numeric input
         if (inputValue === "" || /^\d*$/.test(inputValue)) {
@@ -32,7 +32,7 @@ class NumberField extends TextField {
     render() {
         // Use the render method from TextField but add the onKeyDown handler
         const renderedTextField = super.render();
-        return React.cloneElement(renderedTextField);
+        return cloneElement(renderedTextField);
     }
 }
 

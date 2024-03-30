@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject, JSX } from "preact";
+import { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,23 +29,20 @@ function CodeRenderer(props: any): any {
 }
 
 @mobxReact.observer
-class CodeBlockMarkdown extends React.PureComponent<
-    { children: React.ReactNode; codeSelectSelectedIndex?: number },
-    {}
-> {
+class CodeBlockMarkdown extends PureComponent<{ children: ReactNode; codeSelectSelectedIndex?: number }, {}> {
     blockIndex: number;
-    blockRef: React.RefObject<HTMLPreElement>;
+    blockRef: RefObject<HTMLPreElement>;
 
     constructor(props) {
         super(props);
-        this.blockRef = React.createRef();
+        this.blockRef = createRef();
         this.blockIndex = GlobalModel.inputModel.addCodeBlockToCodeSelect(this.blockRef);
     }
 
     render() {
-        let clickHandler: (e: React.MouseEvent<HTMLElement>, blockIndex: number) => void;
+        let clickHandler: (e: JSX.TargetedMouseEvent<HTMLElement>, blockIndex: number) => void;
         let inputModel = GlobalModel.inputModel;
-        clickHandler = (e: React.MouseEvent<HTMLElement>, blockIndex: number) => {
+        clickHandler = (e: JSX.TargetedMouseEvent<HTMLElement>, blockIndex: number) => {
             inputModel.setCodeSelectSelectedCodeBlock(blockIndex);
         };
         let selected = this.blockIndex == this.props.codeSelectSelectedIndex;
@@ -61,15 +59,12 @@ class CodeBlockMarkdown extends React.PureComponent<
 }
 
 @mobxReact.observer
-class Markdown extends React.PureComponent<
-    { text: string; style?: any; extraClassName?: string; codeSelect?: boolean },
-    {}
-> {
+class Markdown extends PureComponent<{ text: string; style?: any; extraClassName?: string; codeSelect?: boolean }, {}> {
     CodeBlockRenderer(props: any, codeSelect: boolean, codeSelectIndex: number): any {
         if (codeSelect) {
             return <CodeBlockMarkdown codeSelectSelectedIndex={codeSelectIndex}>{props.children}</CodeBlockMarkdown>;
         } else {
-            const clickHandler = (e: React.MouseEvent<HTMLElement>) => {
+            const clickHandler = (e: JSX.TargetedMouseEvent<HTMLElement>) => {
                 let blockText = (e.target as HTMLElement).innerText;
                 if (blockText) {
                     blockText = blockText.replace(/\n$/, ""); // remove trailing newline

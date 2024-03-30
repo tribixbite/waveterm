@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
+import { createRef, RefObject } from "preact";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -28,9 +29,9 @@ import "./app.less";
 dayjs.extend(localizedFormat);
 
 @mobxReact.observer
-class App extends React.PureComponent<{}, {}> {
+class App extends PureComponent<{}, {}> {
     dcWait: OV<boolean> = mobx.observable.box(false, { name: "dcWait" });
-    mainContentRef: React.RefObject<HTMLDivElement> = React.createRef();
+    mainContentRef: RefObject<HTMLDivElement> = createRef();
 
     constructor(props: {}) {
         super(props);

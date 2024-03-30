@@ -1,7 +1,5 @@
-import * as React from "react";
+import { JSX } from "preact";
 import * as mobx from "mobx";
-import * as electron from "electron";
-import { parse } from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import defaultKeybindingsFile from "../../assets/default-keybindings.json";
 const defaultKeybindings: KeybindConfigArray = defaultKeybindingsFile;
@@ -791,7 +789,7 @@ interface WaveKeyboardEvent {
     location: number;
 }
 
-function adaptFromReactOrNativeKeyEvent(event: React.KeyboardEvent | KeyboardEvent): WaveKeyboardEvent {
+function adaptFromReactOrNativeKeyEvent(event: JSX.TargetedKeyboardEvent<any> | KeyboardEvent): WaveKeyboardEvent {
     let rtn: WaveKeyboardEvent = {} as WaveKeyboardEvent;
     rtn.control = event.ctrlKey;
     rtn.shift = event.shiftKey;

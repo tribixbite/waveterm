@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 import { If } from "tsx-control-statements/components";
@@ -11,7 +11,7 @@ import { ReactComponent as CopyIcon } from "@/assets/icons/history/copy.svg";
 
 import "./cmdstrcode.less";
 
-class CmdStrCode extends React.PureComponent<
+class CmdStrCode extends PureComponent<
     {
         cmdstr: string;
         onUse: () => void;

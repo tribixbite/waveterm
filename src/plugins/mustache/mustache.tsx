@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
@@ -13,7 +13,7 @@ import { GlobalModel } from "@/models";
 import "./mustache.less";
 
 @mobxReact.observer
-class SimpleMustacheRenderer extends React.PureComponent<
+class SimpleMustacheRenderer extends PureComponent<
     {
         data: ExtBlob;
         context: RendererContext;

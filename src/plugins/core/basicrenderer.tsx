@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { debounce } from "throttle-debounce";
@@ -158,7 +159,7 @@ class SimpleBlobRendererModel {
 }
 
 @mobxReact.observer
-class SimpleBlobRenderer extends React.PureComponent<
+class SimpleBlobRenderer extends PureComponent<
     {
         rendererContainer: RendererContainerType;
         lineId: string;
@@ -172,7 +173,7 @@ class SimpleBlobRenderer extends React.PureComponent<
     {}
 > {
     model: SimpleBlobRendererModel;
-    wrapperDivRef: React.RefObject<any> = React.createRef();
+    wrapperDivRef: RefObject<any> = createRef();
     rszObs: ResizeObserver;
     updateHeight_debounced: (newHeight: number) => void;
 

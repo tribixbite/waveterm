@@ -1,13 +1,13 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { sprintf } from "sprintf-js";
 import { boundMethod } from "autobind-decorator";
-import { For, If } from "tsx-control-statements/components";
-import cn from "classnames";
+import { For } from "tsx-control-statements/components";
 import { GlobalModel, GlobalCommandRunner, Session, Screen } from "@/models";
 import { ReactComponent as AddIcon } from "@/assets/icons/add.svg";
 import { Reorder } from "framer-motion";
@@ -16,11 +16,11 @@ import { ScreenTab } from "./tab";
 import "./tabs.less";
 
 @mobxReact.observer
-class ScreenTabs extends React.PureComponent<
+class ScreenTabs extends PureComponent<
     { session: Session },
     { showingScreens: Screen[]; scrollIntoViewTimeout: number }
 > {
-    tabsRef: React.RefObject<any> = React.createRef();
+    tabsRef: RefObject<any> = createRef();
     lastActiveScreenId: string = null;
     dragEndTimeout = null;
     scrollIntoViewTimeoutId = null;

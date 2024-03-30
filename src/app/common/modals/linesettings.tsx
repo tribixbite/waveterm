@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -13,7 +13,7 @@ import { commandRtnHandler } from "@/util/util";
 import "./linesettings.less";
 
 @mobxReact.observer
-class LineSettingsModal extends React.PureComponent<{}, {}> {
+class LineSettingsModal extends PureComponent<{}, {}> {
     rendererDropdownActive: OV<boolean> = mobx.observable.box(false, { name: "lineSettings-rendererDropdownActive" });
     errorMessage: OV<string> = mobx.observable.box(null, { name: "ScreenSettings-errorMessage" });
     linenum: number;

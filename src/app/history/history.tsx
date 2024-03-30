@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { If, For } from "tsx-control-statements/components";
@@ -79,10 +80,7 @@ function formatSessionName(snames: Record<string, string>, sessionId: string): s
 }
 
 @mobxReact.observer
-class HistoryCheckbox extends React.PureComponent<
-    { checked: boolean; partialCheck?: boolean; onClick?: () => void },
-    {}
-> {
+class HistoryCheckbox extends PureComponent<{ checked: boolean; partialCheck?: boolean; onClick?: () => void }, {}> {
     @boundMethod
     clickHandler(): void {
         if (this.props.onClick) {
@@ -113,7 +111,7 @@ class HistoryCheckbox extends React.PureComponent<
     }
 }
 
-class HistoryCmdStr extends React.PureComponent<
+class HistoryCmdStr extends PureComponent<
     {
         cmdstr: string;
         onUse: () => void;
@@ -165,7 +163,7 @@ class HistoryCmdStr extends React.PureComponent<
     }
 }
 
-class HistoryKeybindings extends React.PureComponent<{}, {}> {
+class HistoryKeybindings extends PureComponent<{}, {}> {
     @boundMethod
     componentDidMount() {
         const historyViewModel = GlobalModel.historyViewModel;
@@ -187,8 +185,8 @@ class HistoryKeybindings extends React.PureComponent<{}, {}> {
 }
 
 @mobxReact.observer
-class HistoryView extends React.PureComponent<{}, {}> {
-    tableRef: React.RefObject<any> = React.createRef();
+class HistoryView extends PureComponent<{}, {}> {
+    tableRef: RefObject<any> = createRef();
     tableWidth: OV<number> = mobx.observable.box(0, { name: "tableWidth" });
     tableRszObs: ResizeObserver;
     sessionDropdownActive: OV<boolean> = mobx.observable.box(false, { name: "sessionDropdownActive" });
@@ -657,7 +655,7 @@ class HistoryView extends React.PureComponent<{}, {}> {
     }
 }
 
-class LineContainer extends React.PureComponent<{ historyId: string; width: number }, {}> {
+class LineContainer extends PureComponent<{ historyId: string; width: number }, {}> {
     line: LineType;
     historyItem: HistoryItem;
     visible: OV<boolean> = mobx.observable.box(true);

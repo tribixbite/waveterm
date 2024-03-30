@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -13,8 +14,8 @@ import "./disconnected.less";
 const NumOfLines = 50;
 
 @mobxReact.observer
-class DisconnectedModal extends React.PureComponent<{}, {}> {
-    logRef: any = React.createRef();
+class DisconnectedModal extends PureComponent<{}, {}> {
+    logRef: any = createRef();
     logs: mobx.IObservableValue<string> = mobx.observable.box("");
     logInterval: NodeJS.Timeout = null;
 

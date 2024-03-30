@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-preact";
 import { debounce } from "throttle-debounce";
@@ -158,7 +158,7 @@ class OpenAIRendererModel {
 }
 
 @mobxReact.observer
-class OpenAIRenderer extends React.PureComponent<{ model: OpenAIRendererModel }> {
+class OpenAIRenderer extends PureComponent<{ model: OpenAIRendererModel }> {
     renderPrompt(cmd: WebCmd) {
         let cmdStr = cmd.cmdstr.trim();
         if (cmdStr.startsWith("/openai")) {

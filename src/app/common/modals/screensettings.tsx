@@ -1,18 +1,14 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
-import { For } from "tsx-control-statements/components";
-import cn from "classnames";
 import { GlobalModel, GlobalCommandRunner, Screen } from "@/models";
-import { SettingsError, Modal, Dropdown, Tooltip } from "@/elements";
+import { SettingsError, Modal, Tooltip } from "@/elements";
 import * as util from "@/util/util";
 import { Button } from "@/elements";
-import { ReactComponent as GlobeIcon } from "@/assets/icons/globe.svg";
-import { ReactComponent as StatusCircleIcon } from "@/assets/icons/statuscircle.svg";
 import {
     TabColorSelector,
     TabIconSelector,
@@ -37,7 +33,7 @@ Are you sure you want to stop web-sharing this tab?
 `.trim();
 
 @mobxReact.observer
-class ScreenSettingsModal extends React.PureComponent<{}, {}> {
+class ScreenSettingsModal extends PureComponent<{}, {}> {
     shareCopied: OV<boolean> = mobx.observable.box(false, { name: "ScreenSettings-shareCopied" });
     errorMessage: OV<string> = mobx.observable.box(null, { name: "ScreenSettings-errorMessage" });
     screen: Screen;

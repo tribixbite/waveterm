@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import cn from "classnames";
 import { ButtonProps } from "./button";
 
@@ -11,7 +11,7 @@ interface LinkButtonProps extends ButtonProps {
     target?: string;
 }
 
-class LinkButton extends React.PureComponent<LinkButtonProps> {
+class LinkButton extends PureComponent<LinkButtonProps> {
     render() {
         const { leftIcon, rightIcon, children, className, ...rest } = this.props;
 

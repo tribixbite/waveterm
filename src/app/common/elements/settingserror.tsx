@@ -1,13 +1,13 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
 
 @mobxReact.observer
-class SettingsError extends React.PureComponent<{ errorMessage: OV<string> }, {}> {
+class SettingsError extends PureComponent<{ errorMessage: OV<string> }, {}> {
     @boundMethod
     dismissError(): void {
         mobx.action(() => {

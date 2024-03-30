@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -50,7 +51,7 @@ const additionalOptions = [
 }));
 
 @mobxReact.observer
-class TabSwitcherModal extends React.PureComponent<{}, {}> {
+class TabSwitcherModal extends PureComponent<{}, {}> {
     screens: Map<string, OV<string>>[];
     sessions: Map<string, OV<string>>[];
     options: SwitcherDataType[] = [];
@@ -60,7 +61,7 @@ class TabSwitcherModal extends React.PureComponent<{}, {}> {
     focusedIdx: OV<number> = mobx.observable.box(0, { name: "TabSwitcherModal-selectedIdx" });
     activeSessionIdx: number;
     optionRefs = [];
-    listWrapperRef = React.createRef<HTMLDivElement>();
+    listWrapperRef = createRef<HTMLDivElement>();
     prevFocusedIdx = 0;
 
     componentDidMount() {
@@ -281,7 +282,7 @@ class TabSwitcherModal extends React.PureComponent<{}, {}> {
     @boundMethod
     renderOption(option: SwitcherDataType, index: number): JSX.Element {
         if (!this.optionRefs[index]) {
-            this.optionRefs[index] = React.createRef();
+            this.optionRefs[index] = createRef();
         }
         return (
             <div

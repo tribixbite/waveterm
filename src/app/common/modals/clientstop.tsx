@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
 import { If } from "tsx-control-statements/components";
@@ -11,7 +11,7 @@ import { Modal, Button } from "@/elements";
 import "./clientstop.less";
 
 @mobxReact.observer
-class ClientStopModal extends React.PureComponent<{}, {}> {
+class ClientStopModal extends PureComponent<{}, {}> {
     @boundMethod
     refreshClient() {
         GlobalModel.refreshClient();

@@ -1,12 +1,13 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { sprintf } from "sprintf-js";
 import { boundMethod } from "autobind-decorator";
-import { If, For } from "tsx-control-statements/components";
+import { If } from "tsx-control-statements/components";
 import cn from "classnames";
 import { debounce } from "throttle-debounce";
 import dayjs from "dayjs";
@@ -18,7 +19,6 @@ import { LinesView } from "@/app/line/linesview";
 import * as util from "@/util/util";
 import * as appconst from "@/app/appconst";
 import * as textmeasure from "@/util/textmeasure";
-import { NewTabSettings } from "./newtabsettings";
 
 import "./screenview.less";
 import "./tabs.less";
@@ -27,9 +27,9 @@ import { MagicLayout } from "../../magiclayout";
 dayjs.extend(localizedFormat);
 
 @mobxReact.observer
-class ScreenView extends React.PureComponent<{ session: Session; screen: Screen }, {}> {
+class ScreenView extends PureComponent<{ session: Session; screen: Screen }, {}> {
     rszObs: ResizeObserver;
-    screenViewRef: React.RefObject<any> = React.createRef();
+    screenViewRef: RefObject<any> = createRef();
     width: OV<number> = mobx.observable.box(null, { name: "screenview-width" });
     handleResize_debounced: () => void;
     sidebarShowing: OV<boolean> = mobx.observable.box(false, { name: "screenview-sidebarShowing" });
@@ -212,7 +212,7 @@ type SidebarLineContainerPropsType = {
 // note a new SidebarLineContainer will be made for every lineId (so lineId prop should never change)
 // implemented using a 'key' in parent
 @mobxReact.observer
-class SidebarLineContainer extends React.PureComponent<SidebarLineContainerPropsType, {}> {
+class SidebarLineContainer extends PureComponent<SidebarLineContainerPropsType, {}> {
     container: ForwardLineContainer;
     overrideCollapsed: OV<boolean> = mobx.observable.box(false, { name: "overrideCollapsed" });
     visible: OV<boolean> = mobx.observable.box(true, { name: "visible" });
@@ -269,10 +269,10 @@ class SidebarLineContainer extends React.PureComponent<SidebarLineContainerProps
 }
 
 @mobxReact.observer
-class ScreenSidebar extends React.PureComponent<{ screen: Screen; width: string }, {}> {
+class ScreenSidebar extends PureComponent<{ screen: Screen; width: string }, {}> {
     rszObs: ResizeObserver;
     sidebarSize: OV<WindowSize> = mobx.observable.box({ height: 0, width: 0 }, { name: "sidebarSize" });
-    sidebarRef: React.RefObject<any> = React.createRef();
+    sidebarRef: RefObject<any> = createRef();
     handleResize_debounced: (entries: ResizeObserverEntry[]) => void;
 
     constructor(props: any) {
@@ -384,9 +384,9 @@ class ScreenSidebar extends React.PureComponent<{ screen: Screen; width: string 
 
 // screen is not null
 @mobxReact.observer
-class ScreenWindowView extends React.PureComponent<{ session: Session; screen: Screen; width: string }, {}> {
+class ScreenWindowView extends PureComponent<{ session: Session; screen: Screen; width: string }, {}> {
     rszObs: ResizeObserver;
-    windowViewRef: React.RefObject<any>;
+    windowViewRef: RefObject<any>;
 
     width: mobx.IObservableValue<number> = mobx.observable.box(0, { name: "sw-view-width" });
     height: mobx.IObservableValue<number> = mobx.observable.box(0, { name: "sw-view-height" });
@@ -398,7 +398,7 @@ class ScreenWindowView extends React.PureComponent<{ session: Session; screen: S
     constructor(props: any) {
         super(props);
         this.setSize_debounced = debounce(1000, this.setSize.bind(this));
-        this.windowViewRef = React.createRef();
+        this.windowViewRef = createRef();
     }
 
     setSize(width: number, height: number): void {

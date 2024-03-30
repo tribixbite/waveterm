@@ -1,4 +1,5 @@
-import React from "react";
+import { JSX, createRef, RefObject } from "preact";
+import React, { PureComponent, ReactNode } from "preact/compat";
 import cn from "classnames";
 import { ReactComponent as SpinnerIndicator } from "@/assets/icons/spinner-indicator.svg";
 import { boundMethod } from "autobind-decorator";
@@ -9,13 +10,13 @@ import * as appconst from "@/app/appconst";
 import { ReactComponent as RotateIconSvg } from "@/assets/icons/line/rotate.svg";
 
 interface PositionalIconProps {
-    children?: React.ReactNode;
+    children?: ReactNode;
     className?: string;
-    onClick?: React.MouseEventHandler<HTMLDivElement>;
-    divRef?: React.RefObject<HTMLDivElement>;
+    onClick?: JSX.MouseEventHandler<HTMLDivElement>;
+    divRef?: RefObject<HTMLDivElement>;
 }
 
-export class FrontIcon extends React.PureComponent<PositionalIconProps> {
+export class FrontIcon extends PureComponent<PositionalIconProps> {
     render() {
         return (
             <div
@@ -29,7 +30,7 @@ export class FrontIcon extends React.PureComponent<PositionalIconProps> {
     }
 }
 
-export class CenteredIcon extends React.PureComponent<PositionalIconProps> {
+export class CenteredIcon extends PureComponent<PositionalIconProps> {
     render() {
         return (
             <div
@@ -44,10 +45,10 @@ export class CenteredIcon extends React.PureComponent<PositionalIconProps> {
 }
 
 interface ActionsIconProps {
-    onClick: React.MouseEventHandler<HTMLDivElement>;
+    onClick: JSX.MouseEventHandler<HTMLDivElement>;
 }
 
-export class ActionsIcon extends React.PureComponent<ActionsIconProps> {
+export class ActionsIcon extends PureComponent<ActionsIconProps> {
     render() {
         return (
             <CenteredIcon className="actions" onClick={this.props.onClick}>
@@ -57,9 +58,9 @@ export class ActionsIcon extends React.PureComponent<ActionsIconProps> {
     }
 }
 
-class SyncSpin extends React.PureComponent<{
-    classRef?: React.RefObject<HTMLDivElement>;
-    children?: React.ReactNode;
+class SyncSpin extends PureComponent<{
+    classRef?: RefObject<HTMLDivElement>;
+    children?: ReactNode;
     shouldSync?: boolean;
 }> {
     listenerAdded: boolean = false;
@@ -143,8 +144,8 @@ interface StatusIndicatorProps {
  * This component is used to show the status of a command. It will show a spinner around the status indicator if there are running commands. It will also delay showing the spinner for a short time to prevent flickering.
  */
 @mobxReact.observer
-export class StatusIndicator extends React.PureComponent<StatusIndicatorProps> {
-    iconRef: React.RefObject<HTMLDivElement> = React.createRef();
+export class StatusIndicator extends PureComponent<StatusIndicatorProps> {
+    iconRef: RefObject<HTMLDivElement> = createRef();
     spinnerVisible: mobx.IObservableValue<boolean> = mobx.observable.box(false);
     timeout: NodeJS.Timeout;
 
@@ -223,11 +224,11 @@ export class StatusIndicator extends React.PureComponent<StatusIndicatorProps> {
     }
 }
 
-export class RotateIcon extends React.PureComponent<{
+export class RotateIcon extends PureComponent<{
     className?: string;
-    onClick?: React.MouseEventHandler<HTMLDivElement>;
+    onClick?: JSX.MouseEventHandler<HTMLDivElement>;
 }> {
-    iconRef: React.RefObject<HTMLDivElement> = React.createRef();
+    iconRef: RefObject<HTMLDivElement> = createRef();
     render() {
         return (
             <SyncSpin classRef={this.iconRef}>

@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -19,7 +19,7 @@ import "./screenview.less";
 import "./tabs.less";
 
 @mobxReact.observer
-class NewTabSettings extends React.PureComponent<{ screen: Screen }, {}> {
+class NewTabSettings extends PureComponent<{ screen: Screen }, {}> {
     errorMessage: OV<string | null> = mobx.observable.box(null, { name: "NewTabSettings-errorMessage" });
 
     constructor(props) {
@@ -65,7 +65,7 @@ class NewTabSettings extends React.PureComponent<{ screen: Screen }, {}> {
 }
 
 @mobxReact.observer
-class TabNameTextField extends React.PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
+class TabNameTextField extends PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
     @boundMethod
     updateName(val: string): void {
         let { screen } = this.props;
@@ -85,7 +85,7 @@ class TabNameTextField extends React.PureComponent<{ screen: Screen; errorMessag
 }
 
 @mobxReact.observer
-class TabColorSelector extends React.PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
+class TabColorSelector extends PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
     @boundMethod
     selectTabColor(color: string): void {
         let { screen } = this.props;
@@ -121,7 +121,7 @@ class TabColorSelector extends React.PureComponent<{ screen: Screen; errorMessag
 }
 
 @mobxReact.observer
-class TabIconSelector extends React.PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
+class TabIconSelector extends PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
     @boundMethod
     selectTabIcon(icon: string): void {
         let { screen } = this.props;
@@ -158,7 +158,7 @@ class TabIconSelector extends React.PureComponent<{ screen: Screen; errorMessage
 }
 
 @mobxReact.observer
-class TabRemoteSelector extends React.PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
+class TabRemoteSelector extends PureComponent<{ screen: Screen; errorMessage?: OV<string> }, {}> {
     selectedRemoteCN: OV<string> = mobx.observable.box(null, { name: "TabRemoteSelector-selectedRemoteCN" });
 
     @boundMethod

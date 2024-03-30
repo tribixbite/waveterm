@@ -1,4 +1,5 @@
-import React, { Component, ReactNode } from "react";
+import React, { PureComponent, ReactNode } from "preact/compat";
+import { ErrorInfo } from "preact";
 import cn from "classnames";
 
 interface ErrorBoundaryState {
@@ -12,7 +13,7 @@ interface ErrorBoundaryProps {
     lineContext?: RendererContext;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends PureComponent<ErrorBoundaryProps, ErrorBoundaryState> {
     state: ErrorBoundaryState = {
         hasError: false,
         error: null,
@@ -22,7 +23,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         return { hasError: true, error };
     }
 
-    componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
         const { plugin, lineContext } = this.props;
 
         if (plugin && lineContext) {

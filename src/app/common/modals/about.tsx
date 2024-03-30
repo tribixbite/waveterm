@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -16,7 +16,7 @@ import logo from "@/assets/waveterm-logo-with-bg.svg";
 import "./about.less";
 
 @mobxReact.observer
-class AboutModal extends React.PureComponent<{}, {}> {
+class AboutModal extends PureComponent<{}, {}> {
     @boundMethod
     closeModal(): void {
         mobx.action(() => {

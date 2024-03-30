@@ -1,22 +1,22 @@
-import * as React from "react";
+import React, { PureComponent, ReactNode, CSSProperties } from "preact/compat";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 
 import "./button.less";
 
 interface ButtonProps {
-    children: React.ReactNode;
+    children: ReactNode;
     onClick?: () => void;
     disabled?: boolean;
-    leftIcon?: React.ReactNode;
-    rightIcon?: React.ReactNode;
-    style?: React.CSSProperties;
+    leftIcon?: ReactNode;
+    rightIcon?: ReactNode;
+    style?: CSSProperties;
     autoFocus?: boolean;
     className?: string;
     termInline?: boolean;
 }
 
-class Button extends React.PureComponent<ButtonProps> {
+class Button extends PureComponent<ButtonProps> {
     static defaultProps = {
         style: {},
         className: "primary",

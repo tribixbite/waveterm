@@ -1,16 +1,17 @@
-import * as React from "react";
+import { FunctionComponent } from "preact";
+import { useState, useRef, useCallback, useEffect } from "preact/compat";
 import { GlobalModel } from "@/models";
 import { Choose, When, If } from "tsx-control-statements/components";
 import { Modal, PasswordField, TextField, Markdown, Checkbox } from "@/elements";
 
 import "./userinput.less";
 
-export const UserInputModal = (userInputRequest: UserInputRequest) => {
-    const [responseText, setResponseText] = React.useState("");
-    const [countdown, setCountdown] = React.useState(Math.floor(userInputRequest.timeoutms / 1000));
-    const checkboxStatus = React.useRef(false);
+export const UserInputModal: FunctionComponent<UserInputRequest> = (userInputRequest: UserInputRequest) => {
+    const [responseText, setResponseText] = useState("");
+    const [countdown, setCountdown] = useState(Math.floor(userInputRequest.timeoutms / 1000));
+    const checkboxStatus = useRef(false);
 
-    const handleSendCancel = React.useCallback(() => {
+    const handleSendCancel = useCallback(() => {
         GlobalModel.sendUserInput({
             type: "userinputresp",
             requestid: userInputRequest.requestid,
@@ -19,7 +20,7 @@ export const UserInputModal = (userInputRequest: UserInputRequest) => {
         GlobalModel.remotesModel.closeModal();
     }, [responseText, userInputRequest]);
 
-    const handleSendText = React.useCallback(() => {
+    const handleSendText = useCallback(() => {
         GlobalModel.sendUserInput({
             type: "userinputresp",
             requestid: userInputRequest.requestid,
@@ -29,7 +30,7 @@ export const UserInputModal = (userInputRequest: UserInputRequest) => {
         GlobalModel.remotesModel.closeModal();
     }, [responseText, userInputRequest]);
 
-    const handleSendConfirm = React.useCallback(
+    const handleSendConfirm = useCallback(
         (response: boolean) => {
             console.log(`checkbox ${checkboxStatus}\n\n`);
             GlobalModel.sendUserInput({
@@ -43,7 +44,7 @@ export const UserInputModal = (userInputRequest: UserInputRequest) => {
         [userInputRequest]
     );
 
-    React.useEffect(() => {
+    useEffect(() => {
         let timeout: ReturnType<typeof setTimeout>;
         if (countdown == 0) {
             timeout = setTimeout(() => {

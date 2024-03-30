@@ -1,18 +1,17 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject, JSX } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { GlobalModel } from "@/models";
-import { isBlank } from "@/util/util";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 import { If, For } from "tsx-control-statements/components";
 import { Markdown } from "@/elements";
-import { checkKeyPressed, adaptFromReactOrNativeKeyEvent } from "@/util/keyutil";
 
-class AIChatKeybindings extends React.PureComponent<{ AIChatObject: AIChat }, {}> {
+class AIChatKeybindings extends PureComponent<{ AIChatObject: AIChat }, {}> {
     componentDidMount(): void {
         let AIChatObject = this.props.AIChatObject;
         let keybindManager = GlobalModel.keybindManager;
@@ -52,17 +51,17 @@ class AIChatKeybindings extends React.PureComponent<{ AIChatObject: AIChat }, {}
 }
 
 @mobxReact.observer
-class AIChat extends React.PureComponent<{}, {}> {
+class AIChat extends PureComponent<{}, {}> {
     chatListKeyCount: number = 0;
     textAreaNumLines: mobx.IObservableValue<number> = mobx.observable.box(1, { name: "textAreaNumLines" });
-    chatWindowScrollRef: React.RefObject<HTMLDivElement>;
-    textAreaRef: React.RefObject<HTMLTextAreaElement>;
+    chatWindowScrollRef: RefObject<HTMLDivElement>;
+    textAreaRef: RefObject<HTMLTextAreaElement>;
     isFocused: OV<boolean>;
 
     constructor(props: any) {
         super(props);
-        this.chatWindowScrollRef = React.createRef();
-        this.textAreaRef = React.createRef();
+        this.chatWindowScrollRef = createRef();
+        this.textAreaRef = createRef();
         this.isFocused = mobx.observable.box(false, {
             name: "aichat-isfocused",
         });
@@ -194,7 +193,7 @@ class AIChat extends React.PureComponent<{}, {}> {
         this.chatListKeyCount++;
         let senderClassName = chatItem.isassistantresponse ? "chat-msg-assistant" : "chat-msg-user";
         let msgClassName = "chat-msg " + senderClassName;
-        let innerHTML: React.JSX.Element = (
+        let innerHTML: JSX.Element = (
             <span>
                 <div className="chat-msg-header">
                     <i className="fa-sharp fa-solid fa-user"></i>

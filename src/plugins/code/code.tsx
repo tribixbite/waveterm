@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
 import Editor, { Monaco } from "@monaco-editor/react";
@@ -47,7 +48,7 @@ function renderCmdText(text: string): any {
 // there is a global monaco variable (TODO get the correct TS type)
 declare var monaco: any;
 
-class CodeKeybindings extends React.PureComponent<{ codeObject: SourceCodeRenderer }, {}> {
+class CodeKeybindings extends PureComponent<{ codeObject: SourceCodeRenderer }, {}> {
     componentDidMount(): void {
         this.props.codeObject.registerKeybindings();
     }
@@ -59,7 +60,7 @@ class CodeKeybindings extends React.PureComponent<{ codeObject: SourceCodeRender
     }
 }
 
-class SourceCodeRenderer extends React.PureComponent<
+class SourceCodeRenderer extends PureComponent<
     {
         data: ExtBlob;
         cmdstr: string;
@@ -102,14 +103,14 @@ class SourceCodeRenderer extends React.PureComponent<
     cacheKey: string;
     originalCode: string;
     monacoEditor: MonacoTypes.editor.IStandaloneCodeEditor; // reference to mounted monaco editor.  TODO need the correct type
-    markdownRef: React.RefObject<HTMLDivElement>;
+    markdownRef: RefObject<HTMLDivElement>;
     syncing: boolean;
 
     constructor(props) {
         super(props);
         this.monacoEditor = null;
         const editorHeight = Math.max(props.savedHeight - this.getEditorHeightBuffer(), 0); // must subtract the padding/margin to get the real editorHeight
-        this.markdownRef = React.createRef();
+        this.markdownRef = createRef();
         this.syncing = false;
         const isClosed = props.lineState["prompt:closed"];
         this.state = {

@@ -1,15 +1,14 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { JSX, RefObject, Fragment } from "preact";
+import React, { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 import dayjs from "dayjs";
-import { If } from "tsx-control-statements/components";
 
-import { ReactComponent as AppsIcon } from "@/assets/icons/apps.svg";
 import { ReactComponent as WorkspacesIcon } from "@/assets/icons/workspaces.svg";
 import { ReactComponent as SettingsIcon } from "@/assets/icons/settings.svg";
 import { ReactComponent as WaveLogo } from "@/assets/waveterm-logo.svg";
@@ -28,12 +27,12 @@ import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 
 dayjs.extend(localizedFormat);
 
-class SideBarItem extends React.PureComponent<{
-    frontIcon: React.ReactNode;
-    contents: React.ReactNode | string;
-    endIcons?: React.ReactNode[];
+class SideBarItem extends PureComponent<{
+    frontIcon: ReactNode;
+    contents: ReactNode | string;
+    endIcons?: ReactNode[];
     className?: string;
-    onClick?: React.MouseEventHandler<HTMLDivElement>;
+    onClick?: JSX.MouseEventHandler<HTMLDivElement>;
 }> {
     render() {
         return (
@@ -49,7 +48,7 @@ class SideBarItem extends React.PureComponent<{
     }
 }
 
-class HotKeyIcon extends React.PureComponent<{ hotkey: string }> {
+class HotKeyIcon extends PureComponent<{ hotkey: string }> {
     render() {
         return (
             <CenteredIcon className="hotkey">
@@ -60,11 +59,11 @@ class HotKeyIcon extends React.PureComponent<{ hotkey: string }> {
 }
 
 interface MainSideBarProps {
-    parentRef: React.RefObject<HTMLElement>;
+    parentRef: RefObject<HTMLElement>;
 }
 
 @mobxReact.observer
-class MainSideBar extends React.PureComponent<MainSideBarProps, {}> {
+class MainSideBar extends PureComponent<MainSideBarProps, {}> {
     middleHeightSubtractor = mobx.observable.box(404);
 
     handleSessionClick(sessionId: string) {
@@ -166,7 +165,7 @@ class MainSideBar extends React.PureComponent<MainSideBarProps, {}> {
      * @returns Either a banner to install the ready update, a link to the download page, or null if no update is available.
      */
     @boundMethod
-    getUpdateAppBanner(): React.ReactNode {
+    getUpdateAppBanner(): ReactNode {
         const status = GlobalModel.appUpdateStatus.get();
         if (status == "ready") {
             return (
@@ -255,7 +254,7 @@ class MainSideBar extends React.PureComponent<MainSideBarProps, {}> {
                 parentRef={this.props.parentRef}
             >
                 {(toggleCollapse) => (
-                    <React.Fragment>
+                    <Fragment>
                         <div className="title-bar-drag">
                             <div className="logo">
                                 <WaveLogo />
@@ -353,7 +352,7 @@ class MainSideBar extends React.PureComponent<MainSideBarProps, {}> {
                                 />
                             </div>
                         </div>
-                    </React.Fragment>
+                    </Fragment>
                 )}
             </ResizableSidebar>
         );

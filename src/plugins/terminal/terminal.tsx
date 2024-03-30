@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -17,7 +18,7 @@ import "./terminal.less";
 
 dayjs.extend(localizedFormat);
 
-class TerminalKeybindings extends React.PureComponent<{ termWrap: any; lineid: string }, {}> {
+class TerminalKeybindings extends PureComponent<{ termWrap: any; lineid: string }, {}> {
     componentDidMount(): void {
         this.registerKeybindings();
     }
@@ -66,13 +67,13 @@ class TerminalKeybindings extends React.PureComponent<{ termWrap: any; lineid: s
         this.unregisterKeybindings();
     }
 
-    render(): React.ReactNode {
+    render(): ReactNode {
         return null;
     }
 }
 
 @mobxReact.observer
-class TerminalRenderer extends React.PureComponent<
+class TerminalRenderer extends PureComponent<
     {
         screen: LineContainerType;
         line: LineType;
@@ -87,8 +88,8 @@ class TerminalRenderer extends React.PureComponent<
     termLoaded: mobx.IObservableValue<boolean> = mobx.observable.box(false, {
         name: "linecmd-term-loaded",
     });
-    elemRef: React.RefObject<any> = React.createRef();
-    termRef: React.RefObject<any> = React.createRef();
+    elemRef: RefObject<any> = createRef();
+    termRef: RefObject<any> = createRef();
 
     constructor(props) {
         super(props);

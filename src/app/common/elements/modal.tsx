@@ -1,9 +1,9 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { FunctionComponent } from "preact";
+import { PureComponent, ReactNode, createPortal } from "preact/compat";
 import { If } from "tsx-control-statements/components";
-import ReactDOM from "react-dom";
 import { Button } from "./button";
 import { v4 as uuidv4 } from "uuid";
 import { GlobalModel } from "@/models";
@@ -17,7 +17,7 @@ interface ModalHeaderProps {
     title: string;
 }
 
-const ModalHeader: React.FC<ModalHeaderProps> = ({ onClose, keybindings, title }) => (
+const ModalHeader: FunctionComponent<ModalHeaderProps> = ({ onClose, keybindings, title }) => (
     <div className="wave-modal-header">
         <If condition={keybindings && onClose}>
             <ModalKeybindings onCancel={onClose}></ModalKeybindings>
@@ -39,7 +39,7 @@ interface ModalFooterProps {
     keybindings?: boolean;
 }
 
-class ModalKeybindings extends React.PureComponent<{ onOk?: () => void; onCancel?: () => void }, {}> {
+class ModalKeybindings extends PureComponent<{ onOk?: () => void; onCancel?: () => void }, {}> {
     curId: string;
 
     @boundMethod
@@ -70,12 +70,12 @@ class ModalKeybindings extends React.PureComponent<{ onOk?: () => void; onCancel
         GlobalModel.keybindManager.unregisterDomain("modal-" + this.curId);
     }
 
-    render(): React.ReactNode {
+    render(): ReactNode {
         return null;
     }
 }
 
-const ModalFooter: React.FC<ModalFooterProps> = ({
+const ModalFooter: FunctionComponent<ModalFooterProps> = ({
     onCancel,
     onOk,
     cancelLabel = "Cancel",
@@ -101,11 +101,11 @@ const ModalFooter: React.FC<ModalFooterProps> = ({
 
 interface ModalProps {
     className?: string;
-    children?: React.ReactNode;
+    children?: ReactNode;
     onClickBackdrop?: () => void;
 }
 
-class Modal extends React.PureComponent<ModalProps> {
+class Modal extends PureComponent<ModalProps> {
     static Header = ModalHeader;
     static Footer = ModalFooter;
 
@@ -127,7 +127,7 @@ class Modal extends React.PureComponent<ModalProps> {
     }
 
     render() {
-        return ReactDOM.createPortal(this.renderModal(), document.getElementById("app"));
+        return createPortal(this.renderModal(), document.getElementById("app"));
     }
 }
 

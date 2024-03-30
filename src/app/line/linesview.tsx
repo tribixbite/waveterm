@@ -1,12 +1,12 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { sprintf } from "sprintf-js";
 import { boundMethod } from "autobind-decorator";
-import { If, For, When, Otherwise, Choose } from "tsx-control-statements/components";
 import cn from "classnames";
 import dayjs from "dayjs";
 import localizedFormat from "dayjs/plugin/localizedFormat";
@@ -33,7 +33,7 @@ type ScreenInterface = {
 type LineCompFactory = (props: LineFactoryProps) => JSX.Element;
 
 @mobxReact.observer
-class LinesView extends React.PureComponent<
+class LinesView extends PureComponent<
     {
         screen: ScreenInterface;
         width: number;
@@ -44,7 +44,7 @@ class LinesView extends React.PureComponent<
     {}
 > {
     rszObs: ResizeObserver;
-    linesRef: React.RefObject<any>;
+    linesRef: RefObject<any>;
     staticRender: OV<boolean> = mobx.observable.box(true, { name: "static-render" });
     lastOffsetHeight: number = 0;
     lastOffsetWidth: number = 0;
@@ -59,7 +59,7 @@ class LinesView extends React.PureComponent<
 
     constructor(props) {
         super(props);
-        this.linesRef = React.createRef();
+        this.linesRef = createRef();
         this.computeAnchorLine_throttled = throttle(100, this.computeAnchorLine.bind(this), {
             noLeading: true,
             noTrailing: false,

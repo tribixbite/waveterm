@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import * as util from "@/util/util";
@@ -11,7 +12,6 @@ import cn from "classnames";
 import { GlobalModel, GlobalCommandRunner, Screen } from "@/models";
 import { getMonoFontSize } from "@/util/textmeasure";
 import * as appconst from "@/app/appconst";
-import { checkKeyPressed, adaptFromReactOrNativeKeyEvent, WaveKeyboardEvent } from "@/util/keyutil";
 
 type OV<T> = mobx.IObservableValue<T>;
 
@@ -39,7 +39,7 @@ function scrollDiv(div: any, amt: number) {
     div.scrollTo({ top: newScrollTop, behavior: "smooth" });
 }
 
-class HistoryKeybindings extends React.PureComponent<{ inputObject: TextAreaInput }, {}> {
+class HistoryKeybindings extends PureComponent<{ inputObject: TextAreaInput }, {}> {
     componentDidMount(): void {
         if (GlobalModel.activeMainView != "session") {
             return;
@@ -101,7 +101,7 @@ class HistoryKeybindings extends React.PureComponent<{ inputObject: TextAreaInpu
     }
 }
 
-class CmdInputKeybindings extends React.PureComponent<{ inputObject: TextAreaInput }, {}> {
+class CmdInputKeybindings extends PureComponent<{ inputObject: TextAreaInput }, {}> {
     lastTab: boolean;
     curPress: string;
 
@@ -244,14 +244,14 @@ class CmdInputKeybindings extends React.PureComponent<{ inputObject: TextAreaInp
 }
 
 @mobxReact.observer
-class TextAreaInput extends React.PureComponent<{ screen: Screen; onHeightChange: () => void }, {}> {
+class TextAreaInput extends PureComponent<{ screen: Screen; onHeightChange: () => void }, {}> {
     lastTab: boolean = false;
     lastHistoryUpDown: boolean = false;
     lastTabCurLine: OV<string> = mobx.observable.box(null);
     lastFocusType: string = null;
-    mainInputRef: React.RefObject<HTMLTextAreaElement> = React.createRef();
-    historyInputRef: React.RefObject<HTMLInputElement> = React.createRef();
-    controlRef: React.RefObject<HTMLDivElement> = React.createRef();
+    mainInputRef: RefObject<HTMLTextAreaElement> = createRef();
+    historyInputRef: RefObject<HTMLInputElement> = createRef();
+    controlRef: RefObject<HTMLDivElement> = createRef();
     lastHeight: number = 0;
     lastSP: StrWithPos = { str: "", pos: appconst.NoStrPos };
     version: OV<number> = mobx.observable.box(0); // forces render updates
@@ -670,7 +670,7 @@ class TextAreaInput extends React.PureComponent<{ screen: Screen; onHeightChange
                 <textarea
                     key="main"
                     ref={this.mainInputRef}
-                    spellCheck="false"
+                    spellCheck={false}
                     autoComplete="off"
                     autoCorrect="off"
                     id="main-cmd-input"
@@ -686,7 +686,7 @@ class TextAreaInput extends React.PureComponent<{ screen: Screen; onHeightChange
                 <input
                     key="history"
                     ref={this.historyInputRef}
-                    spellCheck="false"
+                    spellCheck={false}
                     autoComplete="off"
                     autoCorrect="off"
                     className="history-input"

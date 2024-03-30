@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-react";
 import * as mobx from "mobx";
 import cn from "classnames";
@@ -28,7 +28,7 @@ const ScreenDeleteMessage = `
 Are you sure you want to delete this tab?
 `.trim();
 
-class SessionKeybindings extends React.Component<{}, {}> {
+class SessionKeybindings extends PureComponent<{}, {}> {
     componentDidMount() {
         let keybindManager = GlobalModel.keybindManager;
         keybindManager.registerKeybinding("mainview", "session", "app:toggleSidebar", (waveEvent) => {
@@ -90,7 +90,7 @@ class SessionKeybindings extends React.Component<{}, {}> {
 }
 
 @mobxReact.observer
-class TabSettingsPulldownKeybindings extends React.Component<{}, {}> {
+class TabSettingsPulldownKeybindings extends PureComponent<{}, {}> {
     componentDidMount() {
         let keybindManager = GlobalModel.keybindManager;
         keybindManager.registerKeybinding("pane", "tabsettings", "generic:cancel", (waveEvent) => {
@@ -109,7 +109,7 @@ class TabSettingsPulldownKeybindings extends React.Component<{}, {}> {
 }
 
 @mobxReact.observer
-class TabSettings extends React.Component<{ screen: Screen }, {}> {
+class TabSettings extends PureComponent<{ screen: Screen }, {}> {
     errorMessage: OV<string> = mobx.observable.box(null, { name: "TabSettings-errorMessage" });
 
     @boundMethod
@@ -179,7 +179,7 @@ class TabSettings extends React.Component<{ screen: Screen }, {}> {
 }
 
 @mobxReact.observer
-class WorkspaceView extends React.Component<{}, {}> {
+class WorkspaceView extends PureComponent<{}, {}> {
     @boundMethod
     toggleTabSettings() {
         mobx.action(() => {

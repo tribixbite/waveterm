@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-preact";
 import { sprintf } from "sprintf-js";
@@ -13,7 +13,7 @@ const MaxMarkdownSize = 200000;
 const DefaultMaxMarkdownWidth = 1000;
 
 @mobxReact.observer
-class SimpleMarkdownRenderer extends React.PureComponent<
+class SimpleMarkdownRenderer extends PureComponent<
     {
         data: ExtBlob;
         context: RendererContext;

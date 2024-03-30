@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import { PureComponent, ReactNode, ReactElement } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -17,8 +18,8 @@ import "./viewremoteconndetail.less";
 import { ModalKeybindings } from "../elements/modal";
 
 @mobxReact.observer
-class ViewRemoteConnDetailModal extends React.PureComponent<{}, {}> {
-    termRef: React.RefObject<any> = React.createRef();
+class ViewRemoteConnDetailModal extends PureComponent<{}, {}> {
+    termRef: RefObject<any> = createRef();
     model: RemotesModel;
 
     constructor(props: { remotesModel?: RemotesModel }) {
@@ -160,8 +161,8 @@ class ViewRemoteConnDetailModal extends React.PureComponent<{}, {}> {
         );
     }
 
-    renderHeaderBtns(remote: RemoteType): React.ReactNode {
-        let buttons: React.ReactNode[] = [];
+    renderHeaderBtns(remote: RemoteType): ReactNode {
+        let buttons: ReactNode[] = [];
         const disconnectButton = (
             <Button className="secondary" onClick={() => this.disconnectRemote(remote.remoteid)}>
                 Disconnect Now
@@ -245,7 +246,7 @@ class ViewRemoteConnDetailModal extends React.PureComponent<{}, {}> {
         buttons.push(archiveButton);
 
         let i = 0;
-        let button: React.ReactNode = null;
+        let button: ReactNode = null;
 
         return (
             <For each="button" of={buttons} index="i">
@@ -413,7 +414,7 @@ class ViewRemoteConnDetailModal extends React.PureComponent<{}, {}> {
     }
 }
 
-function getImportTooltip(remote: RemoteType): React.ReactElement<any, any> {
+function getImportTooltip(remote: RemoteType): ReactElement<any> {
     if (remote.sshconfigsrc == "sshconfig-import") {
         return (
             <Tooltip

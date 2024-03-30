@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { sprintf } from "sprintf-js";
@@ -28,7 +28,7 @@ function truncateWithTDots(str: string, maxLen: number): string {
 }
 
 @mobxReact.observer
-class HItem extends React.PureComponent<
+class HItem extends PureComponent<
     {
         hitem: HistoryItem;
         isSelected: boolean;
@@ -147,7 +147,7 @@ class HItem extends React.PureComponent<
 }
 
 @mobxReact.observer
-class HistoryInfo extends React.PureComponent<{}, {}> {
+class HistoryInfo extends PureComponent<{}, {}> {
     lastClickHNum: string = null;
     lastClickTs: number = 0;
     containingText: mobx.IObservableValue<string> = mobx.observable.box("");

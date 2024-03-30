@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { If } from "tsx-control-statements/components";
@@ -15,7 +15,7 @@ import "./editremoteconn.less";
 const PasswordUnchangedSentinel = "--unchanged--";
 
 @mobxReact.observer
-class EditRemoteConnModal extends React.PureComponent<{}, {}> {
+class EditRemoteConnModal extends PureComponent<{}, {}> {
     tempAlias: OV<string>;
     tempKeyFile: OV<string>;
     tempPassword: OV<string>;

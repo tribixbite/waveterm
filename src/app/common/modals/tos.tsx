@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
 import { GlobalModel, GlobalCommandRunner } from "@/models";
@@ -15,7 +15,7 @@ import github from "@/assets/icons/github.svg";
 import "./tos.less";
 
 @mobxReact.observer
-class TosModal extends React.PureComponent<{}, {}> {
+class TosModal extends PureComponent<{}, {}> {
     @boundMethod
     acceptTos(): void {
         GlobalCommandRunner.clientAcceptTos();

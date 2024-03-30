@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { JSX, createRef, RefObject } from "preact";
+import React, { PureComponent, ReactNode } from "preact/compat";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 import { If } from "tsx-control-statements/components";
@@ -9,15 +10,15 @@ import { If } from "tsx-control-statements/components";
 import "./textfield.less";
 
 interface TextFieldDecorationProps {
-    startDecoration?: React.ReactNode;
-    endDecoration?: React.ReactNode;
+    startDecoration?: ReactNode;
+    endDecoration?: ReactNode;
 }
 interface TextFieldProps {
     label?: string;
     value?: string;
     className?: string;
     onChange?: (value: string) => void;
-    onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+    onKeyDown?: (event: JSX.TargetedKeyboardEvent<HTMLInputElement>) => void;
     onFocus?: () => void;
     onBlur?: () => void;
     placeholder?: string;
@@ -37,8 +38,8 @@ interface TextFieldState {
     hasContent: boolean;
 }
 
-class TextField extends React.PureComponent<TextFieldProps, TextFieldState> {
-    inputRef: React.RefObject<HTMLInputElement>;
+class TextField extends PureComponent<TextFieldProps, TextFieldState> {
+    inputRef: RefObject<HTMLInputElement>;
     state: TextFieldState;
 
     constructor(props: TextFieldProps) {
@@ -51,7 +52,7 @@ class TextField extends React.PureComponent<TextFieldProps, TextFieldState> {
             error: false,
             showHelpText: false,
         };
-        this.inputRef = React.createRef();
+        this.inputRef = createRef();
     }
 
     componentDidUpdate(prevProps: TextFieldProps) {
@@ -107,9 +108,9 @@ class TextField extends React.PureComponent<TextFieldProps, TextFieldState> {
     }
 
     @boundMethod
-    handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    handleInputChange(e: JSX.TargetedEvent) {
         const { required, onChange } = this.props;
-        const inputValue = e.target.value;
+        const inputValue = (e.target as HTMLInputElement).value;
 
         // Check if value is empty and the field is required
         if (required && !inputValue) {

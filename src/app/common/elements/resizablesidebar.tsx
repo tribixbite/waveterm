@@ -1,28 +1,29 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { RefObject, JSX } from "preact";
+import React, { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
-import { GlobalCommandRunner, SidebarModel } from "@/models";
+import { SidebarModel } from "@/models";
 import { MagicLayout } from "@/app/magiclayout";
 
 import "./resizablesidebar.less";
 
 interface ResizableSidebarProps {
-    parentRef: React.RefObject<HTMLElement>;
+    parentRef: RefObject<HTMLElement>;
     position: "left" | "right";
     model: SidebarModel;
     enableSnap?: boolean;
     className?: string;
-    children?: (toggleCollapsed: () => void) => React.ReactNode;
+    children?: (toggleCollapsed: () => void) => ReactNode;
     toggleCollapse?: () => void;
 }
 
 @mobxReact.observer
-class ResizableSidebar extends React.PureComponent<ResizableSidebarProps> {
+class ResizableSidebar extends PureComponent<ResizableSidebarProps> {
     resizeStartWidth: number = 0;
     startX: number = 0;
     prevDelta: number = 0;
@@ -30,7 +31,7 @@ class ResizableSidebar extends React.PureComponent<ResizableSidebarProps> {
     disposeReaction: any;
 
     @boundMethod
-    startResizing(event: React.MouseEvent<HTMLDivElement>) {
+    startResizing(event: JSX.TargetedMouseEvent<HTMLDivElement>) {
         event.preventDefault();
 
         const { parentRef, position, model } = this.props;
@@ -150,7 +151,7 @@ class ResizableSidebar extends React.PureComponent<ResizableSidebarProps> {
                         [this.props.position === "left" ? "right" : "left"]: 0,
                     }}
                     onMouseDown={this.startResizing}
-                    onDoubleClick={this.toggleCollapsed}
+                    onDblClick={this.toggleCollapsed}
                 ></div>
             </div>
         );

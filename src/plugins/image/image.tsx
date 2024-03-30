@@ -1,19 +1,20 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobx from "mobx";
 import * as mobxReact from "mobx-preact";
 
 import "./image.less";
 
 @mobxReact.observer
-class SimpleImageRenderer extends React.PureComponent<
+class SimpleImageRenderer extends PureComponent<
     { data: ExtBlob; context: RendererContext; opts: RendererOpts; savedHeight: number },
     {}
 > {
     objUrl: string = null;
-    imageRef: React.RefObject<any> = React.createRef();
+    imageRef: RefObject<any> = createRef();
     imageLoaded: OV<boolean> = mobx.observable.box(false, { name: "imageLoaded" });
 
     componentDidMount() {

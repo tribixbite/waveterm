@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import cn from "classnames";
 
@@ -9,11 +9,11 @@ import "./inputdecoration.less";
 
 interface InputDecorationProps {
     position?: "start" | "end";
-    children: React.ReactNode;
+    children: ReactNode;
 }
 
 @mobxReact.observer
-class InputDecoration extends React.PureComponent<InputDecorationProps, {}> {
+class InputDecoration extends PureComponent<InputDecorationProps, {}> {
     render() {
         const { children, position = "end" } = this.props;
         return (

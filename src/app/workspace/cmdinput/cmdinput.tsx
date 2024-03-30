@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
+import { createRef, RefObject } from "preact";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -24,9 +25,9 @@ import "./cmdinput.less";
 dayjs.extend(localizedFormat);
 
 @mobxReact.observer
-class CmdInput extends React.PureComponent<{}, {}> {
-    cmdInputRef: React.RefObject<any> = React.createRef();
-    promptRef: React.RefObject<any> = React.createRef();
+class CmdInput extends PureComponent<{}, {}> {
+    cmdInputRef: RefObject<any> = createRef();
+    promptRef: RefObject<any> = createRef();
 
     componentDidMount() {
         this.updateCmdInputHeight();

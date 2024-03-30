@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
@@ -10,9 +11,9 @@ import ReactDOM from "react-dom";
 import "./tooltip.less";
 
 interface TooltipProps {
-    message: React.ReactNode;
-    icon?: React.ReactNode; // Optional icon property
-    children: React.ReactNode;
+    message: ReactNode;
+    icon?: ReactNode; // Optional icon property
+    children: ReactNode;
     className?: string;
 }
 
@@ -21,15 +22,15 @@ interface TooltipState {
 }
 
 @mobxReact.observer
-class Tooltip extends React.PureComponent<TooltipProps, TooltipState> {
-    iconRef: React.RefObject<HTMLDivElement>;
+class Tooltip extends PureComponent<TooltipProps, TooltipState> {
+    iconRef: RefObject<HTMLDivElement>;
 
     constructor(props: TooltipProps) {
         super(props);
         this.state = {
             isVisible: false,
         };
-        this.iconRef = React.createRef();
+        this.iconRef = createRef();
     }
 
     @boundMethod

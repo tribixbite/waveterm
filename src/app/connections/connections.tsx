@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import { PureComponent, ReactElement } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -14,7 +15,7 @@ import * as util from "@/util/util";
 import "./connections.less";
 import { MainView } from "../common/elements/mainview";
 
-class ConnectionsKeybindings extends React.PureComponent<{}, {}> {
+class ConnectionsKeybindings extends PureComponent<{}, {}> {
     componentDidMount() {
         let connectionViewModel = GlobalModel.connectionViewModel;
         let keybindManager = GlobalModel.keybindManager;
@@ -34,8 +35,8 @@ class ConnectionsKeybindings extends React.PureComponent<{}, {}> {
 }
 
 @mobxReact.observer
-class ConnectionsView extends React.PureComponent<{ model: RemotesModel }, { hoveredItemId: string }> {
-    tableRef: React.RefObject<any> = React.createRef();
+class ConnectionsView extends PureComponent<{ model: RemotesModel }, { hoveredItemId: string }> {
+    tableRef: RefObject<any> = createRef();
     tableWidth: OV<number> = mobx.observable.box(0, { name: "tableWidth" });
     tableRszObs: ResizeObserver = null;
 
@@ -76,7 +77,7 @@ class ConnectionsView extends React.PureComponent<{ model: RemotesModel }, { hov
     }
 
     @boundMethod
-    getImportSymbol(item: RemoteType): React.ReactElement<any, any> {
+    getImportSymbol(item: RemoteType): ReactElement<any> {
         const { sshconfigsrc } = item;
         if (sshconfigsrc == "sshconfig-import") {
             return <i title="Connection Imported from SSH Config" className="fa-sharp fa-solid fa-file-import" />;
@@ -153,7 +154,6 @@ class ConnectionsView extends React.PureComponent<{ model: RemotesModel }, { hov
                     className="connections-table"
                     cellSpacing="0"
                     cellPadding="0"
-                    border={0}
                     ref={this.tableRef}
                     onMouseLeave={this.handleTableHoverLeave}
                 >

@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import dayjs from "dayjs";
 import localizedFormat from "dayjs/plugin/localizedFormat";
@@ -83,7 +83,7 @@ function getCwdStr(remote: RemoteType, state: Record<string, string>): string {
 }
 
 @mobxReact.observer
-class Prompt extends React.PureComponent<
+class Prompt extends PureComponent<
     { rptr: RemotePtrType; festate: Record<string, string>; color: boolean; shellInitMsg?: string },
     {}
 > {

@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -14,7 +14,7 @@ import * as appconst from "@/app/appconst";
 import "./clientsettings.less";
 import { MainView } from "../common/elements/mainview";
 
-class ClientSettingsKeybindings extends React.PureComponent<{}, {}> {
+class ClientSettingsKeybindings extends PureComponent<{}, {}> {
     componentDidMount() {
         let clientSettingsViewModel = GlobalModel.clientSettingsViewModel;
         let keybindManager = GlobalModel.keybindManager;
@@ -34,7 +34,7 @@ class ClientSettingsKeybindings extends React.PureComponent<{}, {}> {
 }
 
 @mobxReact.observer
-class ClientSettingsView extends React.PureComponent<{ model: RemotesModel }, { hoveredItemId: string }> {
+class ClientSettingsView extends PureComponent<{ model: RemotesModel }, { hoveredItemId: string }> {
     errorMessage: OV<string> = mobx.observable.box(null, { name: "ClientSettings-errorMessage" });
 
     @boundMethod

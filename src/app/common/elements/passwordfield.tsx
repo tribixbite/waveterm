@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { JSX } from "preact";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
@@ -36,7 +36,7 @@ class PasswordField extends TextField {
     }
 
     @boundMethod
-    handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    handleInputChange(e: JSX.TargetedEvent<HTMLInputElement>) {
         // Call the parent handleInputChange method
         super.handleInputChange(e);
     }

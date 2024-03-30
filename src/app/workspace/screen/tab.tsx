@@ -1,24 +1,24 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 import { GlobalModel, GlobalCommandRunner, Screen } from "@/models";
 import { ActionsIcon, StatusIndicator, CenteredIcon } from "@/common/icons/icons";
-import * as constants from "@/app/appconst";
 import { Reorder } from "framer-motion";
 import { MagicLayout } from "@/app/magiclayout";
 import { TabIcon } from "@/elements/tabicon";
 
 @mobxReact.observer
-class ScreenTab extends React.PureComponent<
+class ScreenTab extends PureComponent<
     { screen: Screen; activeScreenId: string; index: number; onSwitchScreen: (screenId: string) => void },
     {}
 > {
-    tabRef = React.createRef<HTMLUListElement>();
+    tabRef = createRef<HTMLUListElement>();
     dragEndTimeout = null;
     scrollIntoViewTimeout = null;
 
@@ -58,7 +58,7 @@ class ScreenTab extends React.PureComponent<
     }
 
     render() {
-        let { screen, activeScreenId, index, onSwitchScreen } = this.props;
+        let { screen, activeScreenId, onSwitchScreen } = this.props;
         let archived = screen.archived.get() ? (
             <i title="archived" className="fa-sharp fa-solid fa-box-archive" />
         ) : null;

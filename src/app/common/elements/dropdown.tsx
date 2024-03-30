@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { RefObject, createRef } from "preact";
+import React, { PureComponent, ReactNode, TargetedEvent, CSSProperties } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
@@ -13,8 +14,8 @@ import { GlobalModel } from "@/models";
 import "./dropdown.less";
 
 interface DropdownDecorationProps {
-    startDecoration?: React.ReactNode;
-    endDecoration?: React.ReactNode;
+    startDecoration?: ReactNode;
+    endDecoration?: ReactNode;
 }
 
 interface DropdownProps {
@@ -37,9 +38,9 @@ interface DropdownState {
 }
 
 @mobxReact.observer
-class Dropdown extends React.PureComponent<DropdownProps, DropdownState> {
-    wrapperRef: React.RefObject<HTMLDivElement>;
-    menuRef: React.RefObject<HTMLDivElement>;
+class Dropdown extends PureComponent<DropdownProps, DropdownState> {
+    wrapperRef: RefObject<HTMLDivElement>;
+    menuRef: RefObject<HTMLDivElement>;
     timeoutId: any;
     curUuid: string;
 
@@ -51,8 +52,8 @@ class Dropdown extends React.PureComponent<DropdownProps, DropdownState> {
             highlightedIndex: -1,
             isTouched: false,
         };
-        this.wrapperRef = React.createRef();
-        this.menuRef = React.createRef();
+        this.wrapperRef = createRef();
+        this.menuRef = createRef();
         this.curUuid = uuidv4();
     }
 
@@ -182,10 +183,10 @@ class Dropdown extends React.PureComponent<DropdownProps, DropdownState> {
     }
 
     @boundMethod
-    handleKeyDown(event: React.KeyboardEvent) {}
+    handleKeyDown(event) {}
 
     @boundMethod
-    handleSelect(value: string, event?: React.MouseEvent | React.KeyboardEvent) {
+    handleSelect(value: string, event?: TargetedEvent) {
         const { onChange } = this.props;
         if (event) {
             event.stopPropagation(); // This stops the event from bubbling up to the wrapper
@@ -205,7 +206,7 @@ class Dropdown extends React.PureComponent<DropdownProps, DropdownState> {
     }
 
     @boundMethod
-    calculatePosition(): React.CSSProperties {
+    calculatePosition(): CSSProperties {
         if (this.wrapperRef.current) {
             const rect = this.wrapperRef.current.getBoundingClientRect();
             return {

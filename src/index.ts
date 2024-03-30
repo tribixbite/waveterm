@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as mobx from "mobx";
-import * as React from "react";
+import { createElement } from "preact";
 import { createRoot } from "react-dom/client";
 import { sprintf } from "sprintf-js";
 import { App } from "@/app/app";
@@ -19,7 +19,7 @@ let BUILD = __WAVETERM_BUILD__;
 loadFonts();
 
 document.addEventListener("DOMContentLoaded", () => {
-    let reactElem = React.createElement(App, null, null);
+    let reactElem = createElement(App, null, null);
     let elem = document.getElementById("app");
     let root = createRoot(elem);
     document.fonts.ready.then(() => {

@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { RefObject, Fragment } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import dayjs from "dayjs";
 import { If, For } from "tsx-control-statements/components";
@@ -15,11 +16,11 @@ import "./right.less";
 dayjs.extend(localizedFormat);
 
 interface RightSideBarProps {
-    parentRef: React.RefObject<HTMLElement>;
+    parentRef: RefObject<HTMLElement>;
 }
 
 @mobxReact.observer
-class KeybindDevPane extends React.PureComponent<{}, {}> {
+class KeybindDevPane extends PureComponent<{}, {}> {
     render() {
         let curActiveKeybinds: Array<{ name: string; domains: Array<string> }> =
             GlobalModel.keybindManager.getActiveKeybindings();
@@ -54,7 +55,7 @@ class KeybindDevPane extends React.PureComponent<{}, {}> {
 }
 
 @mobxReact.observer
-class RightSideBar extends React.PureComponent<RightSideBarProps, {}> {
+class RightSideBar extends PureComponent<RightSideBarProps, {}> {
     render() {
         return (
             <ResizableSidebar
@@ -65,7 +66,7 @@ class RightSideBar extends React.PureComponent<RightSideBarProps, {}> {
                 parentRef={this.props.parentRef}
             >
                 {(toggleCollapse) => (
-                    <React.Fragment>
+                    <Fragment>
                         <div className="header">
                             <Button className="secondary ghost" onClick={toggleCollapse}>
                                 <i className="fa-sharp fa-regular fa-xmark"></i>
@@ -74,7 +75,7 @@ class RightSideBar extends React.PureComponent<RightSideBarProps, {}> {
                         <If condition={GlobalModel.isDev}>
                             <KeybindDevPane></KeybindDevPane>
                         </If>
-                    </React.Fragment>
+                    </Fragment>
                 )}
             </ResizableSidebar>
         );

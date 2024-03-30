@@ -1,7 +1,8 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { createRef, RefObject } from "preact";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -14,7 +15,7 @@ import { v4 as uuidv4 } from "uuid";
 import "./inlinesettingstextedit.less";
 
 @mobxReact.observer
-class InlineSettingsTextEdit extends React.PureComponent<
+class InlineSettingsTextEdit extends PureComponent<
     {
         text: string;
         value: string;
@@ -28,7 +29,7 @@ class InlineSettingsTextEdit extends React.PureComponent<
     isEditing: OV<boolean> = mobx.observable.box(false, { name: "inlineedit-isEditing" });
     tempText: OV<string>;
     shouldFocus: boolean = false;
-    inputRef: React.RefObject<any> = React.createRef();
+    inputRef: RefObject<any> = createRef();
     curId: string;
 
     componentDidMount(): void {

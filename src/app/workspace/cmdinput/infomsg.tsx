@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import { If, For } from "tsx-control-statements/components";
 import cn from "classnames";
@@ -13,7 +13,7 @@ import * as appconst from "@/app/appconst";
 dayjs.extend(localizedFormat);
 
 @mobxReact.observer
-class InfoMsg extends React.PureComponent<{}, {}> {
+class InfoMsg extends PureComponent<{}, {}> {
     getAfterSlash(s: string): string {
         if (s.startsWith("^/")) {
             return s.substring(1);

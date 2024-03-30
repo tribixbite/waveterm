@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import { boundMethod } from "autobind-decorator";
 import { If } from "tsx-control-statements/components";
@@ -12,7 +12,7 @@ import "./alert.less";
 import { ModalKeybindings } from "../elements/modal";
 
 @mobxReact.observer
-class AlertModal extends React.PureComponent<{}, {}> {
+class AlertModal extends PureComponent<{}, {}> {
     @boundMethod
     closeModal(): void {
         GlobalModel.modalsModel.popModal(() => GlobalModel.cancelAlert());

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, createRef } from "react";
+import { RefObject, FunctionComponent, createRef, Fragment } from "preact";
+import { useState, useEffect, useRef, CSSProperties } from "preact/compat";
 import * as mobx from "mobx";
 import ReactDOM from "react-dom";
 import dayjs from "dayjs";
@@ -11,7 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 import "./datepicker.less";
 
 interface YearRefs {
-    [key: number]: React.RefObject<HTMLDivElement>;
+    [key: number]: RefObject<HTMLDivElement>;
 }
 
 type DatePickerProps = {
@@ -20,7 +21,7 @@ type DatePickerProps = {
     format?: string;
 };
 
-const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/YYYY", onSelectDate }) => {
+const DatePicker: FunctionComponent<DatePickerProps> = ({ selectedDate, format = "MM/DD/YYYY", onSelectDate }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [selDate, setSelDate] = useState(dayjs(selectedDate)); // Initialize with dayjs object
     const [showYearAccordion, setShowYearAccordion] = useState(false);
@@ -199,7 +200,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
         return days;
     };
 
-    const calculatePosition = (): React.CSSProperties => {
+    const calculatePosition = (): CSSProperties => {
         if (wrapperRef.current) {
             const rect = wrapperRef.current.getBoundingClientRect();
             return {
@@ -219,7 +220,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
 
         for (let year = startYear; year <= endYear; year++) {
             yearsRange.push(year);
-            yearRefs.current[year] = React.createRef();
+            yearRefs.current[year] = createRef();
         }
 
         return yearsRange;
@@ -450,14 +451,14 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
                     const inputRef = inputRefs.current[part];
 
                     return (
-                        <React.Fragment key={part}>
+                        <Fragment key={part}>
                             {index > 0 && <span>{delimiter}</span>}
                             <input
                                 readOnly
                                 ref={inputRef}
                                 type="text"
                                 value={dateParts[part]}
-                                onChange={(e) => handleDatePartChange(part, e.target.value)}
+                                onChange={(e) => handleDatePartChange(part, (e.target as HTMLInputElement).value)}
                                 onKeyDown={(e) => handleKeyDown(e, part)}
                                 onMouseDown={(e) => handleMouseDown(e, part)}
                                 onFocus={(e) => handleFocus(e, part)}
@@ -466,7 +467,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ selectedDate, format = "MM/DD/Y
                                 className="date-input"
                                 placeholder={part}
                             />
-                        </React.Fragment>
+                        </Fragment>
                     );
                 })}
                 <i

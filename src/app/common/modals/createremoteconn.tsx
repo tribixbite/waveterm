@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
@@ -13,7 +13,7 @@ import * as util from "@/util/util";
 import "./createremoteconn.less";
 
 @mobxReact.observer
-class CreateRemoteConnModal extends React.PureComponent<{}, {}> {
+class CreateRemoteConnModal extends PureComponent<{}, {}> {
     tempAlias: OV<string>;
     tempHostName: OV<string>;
     tempPort: OV<string>;

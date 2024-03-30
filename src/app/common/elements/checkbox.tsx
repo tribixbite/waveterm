@@ -1,18 +1,17 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
-import * as mobx from "mobx";
+import { PureComponent, ReactNode } from "preact/compat";
 import cn from "classnames";
 
 import "./checkbox.less";
 
-class Checkbox extends React.PureComponent<
+class Checkbox extends PureComponent<
     {
         checked?: boolean;
         defaultChecked?: boolean;
         onChange: (value: boolean) => void;
-        label: React.ReactNode;
+        label: ReactNode;
         className?: string;
         id?: string;
     },

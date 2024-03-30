@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import React, { PureComponent } from "preact/compat";
 import { boundMethod } from "autobind-decorator";
 
 import "./status.less";
@@ -11,7 +11,7 @@ interface StatusProps {
     text: string;
 }
 
-class Status extends React.PureComponent<StatusProps> {
+class Status extends PureComponent<StatusProps> {
     @boundMethod
     renderDot() {
         const { status } = this.props;

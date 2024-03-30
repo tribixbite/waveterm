@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type React from "react";
+import { Fragment, createRef, RefObject } from "preact";
 import * as mobx from "mobx";
 import { boundMethod } from "autobind-decorator";
 import { isBlank } from "@/util/util";
@@ -28,9 +28,9 @@ class InputModel {
     infoShow: OV<boolean> = mobx.observable.box(false);
     aIChatShow: OV<boolean> = mobx.observable.box(false);
     cmdInputHeight: OV<number> = mobx.observable.box(0);
-    aiChatTextAreaRef: React.RefObject<HTMLTextAreaElement>;
-    aiChatWindowRef: React.RefObject<HTMLDivElement>;
-    codeSelectBlockRefArray: Array<React.RefObject<HTMLElement>>;
+    aiChatTextAreaRef: RefObject<HTMLTextAreaElement>;
+    aiChatWindowRef: RefObject<HTMLDivElement>;
+    codeSelectBlockRefArray: Array<RefObject<HTMLElement>>;
     codeSelectSelectedIndex: OV<number> = mobx.observable.box(-1);
 
     AICmdInfoChatItems: mobx.IObservableArray<OpenAICmdInfoChatMessageType> = mobx.observable.array([], {
@@ -513,10 +513,7 @@ class InputModel {
         }
     }
 
-    setCmdInfoChatRefs(
-        textAreaRef: React.RefObject<HTMLTextAreaElement>,
-        chatWindowRef: React.RefObject<HTMLDivElement>
-    ) {
+    setCmdInfoChatRefs(textAreaRef: RefObject<HTMLTextAreaElement>, chatWindowRef: RefObject<HTMLDivElement>) {
         this.aiChatTextAreaRef = textAreaRef;
         this.aiChatWindowRef = chatWindowRef;
     }
@@ -540,7 +537,7 @@ class InputModel {
         }
     }
 
-    addCodeBlockToCodeSelect(blockRef: React.RefObject<HTMLElement>): number {
+    addCodeBlockToCodeSelect(blockRef: RefObject<HTMLElement>): number {
         let rtn = -1;
         rtn = this.codeSelectBlockRefArray.length;
         this.codeSelectBlockRefArray.push(blockRef);

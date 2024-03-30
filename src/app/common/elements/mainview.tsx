@@ -1,7 +1,7 @@
 // Copyright 2023, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
+import { PureComponent, ReactNode } from "preact/compat";
 import * as mobxReact from "mobx-preact";
 import cn from "classnames";
 import { GlobalModel } from "@/models";
@@ -9,10 +9,10 @@ import { GlobalModel } from "@/models";
 import "./mainview.less";
 
 @mobxReact.observer
-class MainView extends React.PureComponent<{
+class MainView extends PureComponent<{
     title: string;
     onClose: () => void;
-    children: React.ReactNode;
+    children: ReactNode;
     className?: string;
 }> {
     render() {
