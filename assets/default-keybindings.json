@@ -194,11 +194,11 @@
     },
     {
       "command": "app:selectTabLeft",
-      "keys": ["Cmd:["]
+      "keys": ["Cmd:[", "Shift:Cmd:["]
     },
     {
       "command": "app:selectTabRight",
-      "keys": ["Cmd:]"]
+      "keys": ["Cmd:]", "Shift:Cmd:]"]
     },
     {
       "command": "app:selectWorkspace-1",
