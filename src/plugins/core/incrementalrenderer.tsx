@@ -24,7 +24,7 @@ class IncrementalRenderer extends React.PureComponent<
 
     constructor(props: any) {
         super(props);
-        let { rendererContainer, lineId, plugin, initParams } = this.props;
+        const { rendererContainer, lineId, plugin, initParams } = this.props;
         this.model = plugin.modelCtor();
         this.model.initialize(initParams);
         rendererContainer.registerRenderer(lineId, this.model);
@@ -61,7 +61,7 @@ class IncrementalRenderer extends React.PureComponent<
     }
 
     componentWillUnmount() {
-        let { rendererContainer, lineId } = this.props;
+        const { rendererContainer, lineId } = this.props;
         rendererContainer.unloadRenderer(lineId);
         if (this.rszObs != null) {
             this.rszObs.disconnect();
@@ -74,8 +74,8 @@ class IncrementalRenderer extends React.PureComponent<
     }
 
     render() {
-        let { plugin } = this.props;
-        let Comp = plugin.fullComponent;
+        const { plugin } = this.props;
+        const Comp = plugin.fullComponent;
         if (Comp == null) {
             <div ref={this.wrapperDivRef}>(no component found in plugin)</div>;
         }

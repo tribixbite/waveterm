@@ -132,7 +132,7 @@ class TerminalRenderer extends React.PureComponent<
     }
 
     checkLoad(): void {
-        let { staticRender, visible, collapsed } = this.props;
+        const { staticRender, visible, collapsed } = this.props;
         if (staticRender) {
             return;
         }

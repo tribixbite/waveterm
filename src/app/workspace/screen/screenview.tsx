@@ -157,7 +157,7 @@ class ScreenView extends React.PureComponent<{ session: Session; screen: Screen 
         let winWidth = "100%";
         let sidebarWidth = "0px";
         if (hasSidebar) {
-            let targetWidth = viewOpts?.sidebar?.width;
+            const targetWidth = viewOpts?.sidebar?.width;
             let realWidth = 0;
             if (util.isBlank(targetWidth) || screenWidth < MagicLayout.ScreenSidebarMinWidth * 2) {
                 realWidth = Math.floor(screenWidth / 2) - MagicLayout.ScreenSidebarWidthPadding;
@@ -425,8 +425,8 @@ class ScreenWindowView extends React.PureComponent<ScreenWindowViewProps, {}> {
         const { screen } = this.props_;
         const wvElem = this.windowViewRef.current;
         if (wvElem != null) {
-            let width = wvElem.offsetWidth;
-            let height = wvElem.offsetHeight;
+            const width = wvElem.offsetWidth;
+            const height = wvElem.offsetHeight;
             this.setSize(width, height);
             this.rszObs = new ResizeObserver(this.handleResize.bind(this));
             this.rszObs.observe(wvElem);
@@ -564,19 +564,17 @@ class ScreenWindowView extends React.PureComponent<ScreenWindowViewProps, {}> {
         const renderMode = this.renderMode.get();
         return (
             <div className="window-view" ref={this.windowViewRef} style={{ width }}>
-                <If condition={lines.length == 0}>
-                    <If condition={screen.nextLineNum.get() != 1}>
-                        <div className="window-empty" ref={this.windowViewRef} data-screenid={screen.screenId}>
-                            <div key="lines" className="lines"></div>
-                            <div key="window-empty" className={cn("window-empty")}>
-                                <div>
-                                    <code className="text-standard">
-                                        [workspace="{session.name.get()}" tab="{screen.name.get()}"]
-                                    </code>
-                                </div>
+                <If condition={lines.length == 0 && screen.nextLineNum.get() != 1}>
+                    <div className="window-empty" ref={this.windowViewRef} data-screenid={screen.screenId}>
+                        <div key="lines" className="lines"></div>
+                        <div key="window-empty" className={cn("window-empty")}>
+                            <div>
+                                <code className="text-standard">
+                                    [workspace="{session.name.get()}" tab="{screen.name.get()}"]
+                                </code>
                             </div>
                         </div>
-                    </If>
+                    </div>
                 </If>
                 <If condition={lines.length > 0}>
                     <LinesView

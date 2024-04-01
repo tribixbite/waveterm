@@ -70,15 +70,14 @@ class LinesView extends React.PureComponent<
 
     @boundMethod
     scrollHandler() {
-        let linesElem = this.linesRef.current;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return;
         }
-        let heightDiff = linesElem.offsetHeight - this.lastOffsetHeight;
+        const heightDiff = linesElem.offsetHeight - this.lastOffsetHeight;
         if (heightDiff > 0) {
             this.ignoreNextScroll = true;
         }
-        let fromBottom = linesElem.scrollHeight - linesElem.scrollTop - linesElem.offsetHeight;
         // console.log("scroll", linesElem.scrollTop, (this.ignoreNextScroll ? "ignore" : "------"), "height-diff:" + heightDiff, "scroll-height:" + linesElem.scrollHeight, "from-bottom:" + fromBottom);
         this.computeVisibleMap_debounced(); // always do this
         if (this.ignoreNextScroll) {
@@ -89,24 +88,24 @@ class LinesView extends React.PureComponent<
     }
 
     computeAnchorLine(): void {
-        let { screen } = this.props;
-        let linesElem = this.linesRef.current;
+        const { screen } = this.props;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             screen.setAnchorFields(null, 0, "no-lines");
             return;
         }
-        let lineElemArr = linesElem.querySelectorAll(".line");
+        const lineElemArr = linesElem.querySelectorAll(".line");
         if (lineElemArr == null || lineElemArr.length == 0) {
             screen.setAnchorFields(null, 0, "no-line");
             return;
         }
-        let scrollTop = linesElem.scrollTop;
-        let height = linesElem.clientHeight;
-        let containerBottom = scrollTop + height;
+        const scrollTop = linesElem.scrollTop;
+        const height = linesElem.clientHeight;
+        const containerBottom = scrollTop + height;
         let anchorElem: HTMLElement = null;
         for (let i = lineElemArr.length - 1; i >= 0; i--) {
-            let lineElem = lineElemArr[i];
-            let bottomPos = lineElem.offsetTop + lineElem.offsetHeight;
+            const lineElem = lineElemArr[i];
+            const bottomPos = lineElem.offsetTop + lineElem.offsetHeight;
             if (anchorElem == null && (bottomPos <= containerBottom || lineElem.offsetTop <= scrollTop)) {
                 anchorElem = lineElem;
             }
@@ -114,35 +113,34 @@ class LinesView extends React.PureComponent<
         if (anchorElem == null) {
             anchorElem = lineElemArr[0];
         }
-        let anchorLineNum = parseInt(anchorElem.dataset.linenum);
-        let anchorOffset = containerBottom - (anchorElem.offsetTop + anchorElem.offsetHeight);
+        const anchorLineNum = parseInt(anchorElem.dataset.linenum);
+        const anchorOffset = containerBottom - (anchorElem.offsetTop + anchorElem.offsetHeight);
         // console.log("compute-anchor-line", anchorLineNum, anchorOffset, "st:" + scrollTop);
         screen.setAnchorFields(anchorLineNum, anchorOffset, "computeAnchorLine");
     }
 
     computeVisibleMap(): void {
-        let linesElem = this.linesRef.current;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return;
         }
         if (linesElem.offsetParent == null) {
             return; // handles when parent is set to display:none (is-hidden)
         }
-        let lineElemArr = linesElem.querySelectorAll(".line");
+        const lineElemArr = linesElem.querySelectorAll(".line");
         if (lineElemArr == null) {
             return;
         }
         if (linesElem.clientHeight == 0) {
             return; // when linesElem is collapsed (or display:none)
         }
-        let containerTop = linesElem.scrollTop - LinesVisiblePadding;
-        let containerBot = linesElem.scrollTop + linesElem.clientHeight + LinesVisiblePadding;
-        let newMap = new Map<string, boolean>();
+        const containerTop = linesElem.scrollTop - LinesVisiblePadding;
+        const containerBot = linesElem.scrollTop + linesElem.clientHeight + LinesVisiblePadding;
+        const newMap = new Map<string, boolean>();
         // console.log("computevismap", linesElem.scrollTop, linesElem.clientHeight, containerTop + "-" + containerBot);
-        for (let i = 0; i < lineElemArr.length; i++) {
-            let lineElem = lineElemArr[i];
-            let lineTop = lineElem.offsetTop;
-            let lineBot = lineElem.offsetTop + lineElem.offsetHeight;
+        for (const lineElem of lineElemArr) {
+            const lineTop = lineElem.offsetTop;
+            const lineBot = lineElem.offsetTop + lineElem.offsetHeight;
             let isVis = false;
             if (lineTop >= containerTop && lineTop <= containerBot) {
                 isVis = true;
@@ -151,13 +149,12 @@ class LinesView extends React.PureComponent<
                 isVis = true;
             }
             // console.log("line", lineElem.dataset.linenum, "top=" + lineTop, "bot=" + lineTop, isVis);
-            let lineNumInt = parseInt(lineElem.dataset.linenum);
             newMap.set(lineElem.dataset.linenum, isVis);
             // console.log("setvis", sprintf("%4d %4d-%4d (%4d) %s", lineElem.dataset.linenum, lineTop, lineBot, lineElem.offsetHeight, isVis));
         }
         // console.log("compute vismap", "[" + this.firstVisLine + "," + this.lastVisLine + "]");
         mobx.action(() => {
-            for (let [k, v] of newMap) {
+            for (const [k, v] of newMap) {
                 let oldVal = this.visibleMap.get(k);
                 if (oldVal == null) {
                     oldVal = mobx.observable.box(v, { name: "lines-vis-map" });
@@ -167,7 +164,7 @@ class LinesView extends React.PureComponent<
                     oldVal.set(v);
                 }
             }
-            for (let [k, v] of this.visibleMap) {
+            for (const [k, _] of this.visibleMap) {
                 if (!newMap.has(k)) {
                     this.visibleMap.delete(k);
                 }
@@ -176,11 +173,11 @@ class LinesView extends React.PureComponent<
     }
 
     printVisMap(): void {
-        let visMap = this.visibleMap;
-        let lines = this.props.lines;
-        let visLines: string[] = [];
-        for (let i = 0; i < lines.length; i++) {
-            let linenum = String(lines[i].linenum);
+        const visMap = this.visibleMap;
+        const { lines } = this.props;
+        const visLines: string[] = [];
+        for (const line of lines) {
+            const linenum = String(line.linenum);
             if (visMap.get(linenum).get()) {
                 visLines.push(linenum);
             }
@@ -189,28 +186,28 @@ class LinesView extends React.PureComponent<
     }
 
     restoreAnchorOffset(reason: string): void {
-        let { lines } = this.props;
-        let linesElem = this.linesRef.current;
+        const { lines } = this.props;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return;
         }
-        let anchor = this.getAnchor();
-        let anchorElem = linesElem.querySelector(sprintf('.line[data-linenum="%d"]', anchor.anchorLine));
+        const anchor = this.getAnchor();
+        const anchorElem = linesElem.querySelector(sprintf('.line[data-linenum="%d"]', anchor.anchorLine));
         if (anchorElem == null) {
             return;
         }
-        let isLastLine = anchor.anchorIndex == lines.length - 1;
-        let scrollTop = linesElem.scrollTop;
-        let height = linesElem.clientHeight;
-        let containerBottom = scrollTop + height;
-        let curAnchorOffset = containerBottom - (anchorElem.offsetTop + anchorElem.offsetHeight);
+        const isLastLine = anchor.anchorIndex == lines.length - 1;
+        const scrollTop = linesElem.scrollTop;
+        const height = linesElem.clientHeight;
+        const containerBottom = scrollTop + height;
+        const curAnchorOffset = containerBottom - (anchorElem.offsetTop + anchorElem.offsetHeight);
         let newAnchorOffset = anchor.anchorOffset;
         if (isLastLine && newAnchorOffset == 0) {
             newAnchorOffset = 10;
         }
         if (curAnchorOffset != newAnchorOffset) {
-            let offsetDiff = curAnchorOffset - newAnchorOffset;
-            let newScrollTop = scrollTop - offsetDiff;
+            const offsetDiff = curAnchorOffset - newAnchorOffset;
+            const newScrollTop = scrollTop - offsetDiff;
             // console.log("update scrolltop", reason, "line=" + anchor.anchorLine, -offsetDiff, linesElem.scrollTop, "=>", newScrollTop);
             linesElem.scrollTop = newScrollTop;
             this.ignoreNextScroll = true;
@@ -218,9 +215,9 @@ class LinesView extends React.PureComponent<
     }
 
     componentDidMount(): void {
-        let { screen, lines } = this.props;
-        let linesElem = this.linesRef.current;
-        let anchor = this.getAnchor();
+        const { screen, lines } = this.props;
+        const linesElem = this.linesRef.current;
+        const anchor = this.getAnchor();
         if (anchor.anchorIndex == lines.length - 1) {
             if (linesElem != null) {
                 linesElem.scrollTop = linesElem.scrollHeight;
@@ -244,33 +241,33 @@ class LinesView extends React.PureComponent<
     }
 
     getLineElem(lineNum: number): HTMLElement {
-        let linesElem = this.linesRef.current;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return null;
         }
-        let elem = linesElem.querySelector(sprintf('.line[data-linenum="%d"]', lineNum));
+        const elem = linesElem.querySelector(sprintf('.line[data-linenum="%d"]', lineNum));
         return elem;
     }
 
     getLineViewInfo(lineNum: number): { height: number; topOffset: number; botOffset: number; anchorOffset: number } {
-        let linesElem = this.linesRef.current;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return null;
         }
-        let lineElem = this.getLineElem(lineNum);
+        const lineElem = this.getLineElem(lineNum);
         if (lineElem == null) {
             return null;
         }
-        let rtn = {
+        const rtn = {
             height: lineElem.offsetHeight,
             topOffset: 0,
             botOffset: 0,
             anchorOffset: 0,
         };
-        let containerTop = linesElem.scrollTop;
-        let containerBot = linesElem.scrollTop + linesElem.clientHeight;
-        let lineTop = lineElem.offsetTop;
-        let lineBot = lineElem.offsetTop + lineElem.offsetHeight;
+        const containerTop = linesElem.scrollTop;
+        const containerBot = linesElem.scrollTop + linesElem.clientHeight;
+        const lineTop = lineElem.offsetTop;
+        const lineBot = lineElem.offsetTop + lineElem.offsetHeight;
         if (lineTop < containerTop) {
             rtn.topOffset = lineTop - containerTop;
         } else if (lineTop > containerBot) {
@@ -286,26 +283,26 @@ class LinesView extends React.PureComponent<
     }
 
     updateSelectedLine(): void {
-        let { screen, lines } = this.props;
-        let linesElem = this.linesRef.current;
+        const { screen, lines } = this.props;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return null;
         }
-        let newLine = screen.getSelectedLine();
+        const newLine = screen.getSelectedLine();
         if (newLine == 0) {
             return;
         }
-        let line = screen.getLineByNum(newLine);
+        const line = screen.getLineByNum(newLine);
         if (line == null || screen.isLineIdInSidebar(line.lineid)) {
             return;
         }
-        let lidx = this.findClosestLineIndex(newLine);
+        const lidx = this.findClosestLineIndex(newLine);
         this.setLineVisible(newLine, true);
         // console.log("update selected line", this.lastSelectedLine, "=>", newLine, sprintf("anchor=%d:%d", screen.anchorLine, screen.anchorOffset));
-        let viewInfo = this.getLineViewInfo(newLine);
-        let isFirst = lidx.index == 0;
-        let isLast = lidx.index == lines.length - 1;
-        let offsetDelta = isLast ? 10 : isFirst ? -28 : 0;
+        const viewInfo = this.getLineViewInfo(newLine);
+        const isFirst = lidx.index == 0;
+        const isLast = lidx.index == lines.length - 1;
+        const offsetDelta = isLast ? 10 : isFirst ? -28 : 0;
         if (viewInfo == null) {
             screen.setAnchorFields(newLine, 0 + offsetDelta, "updateSelectedLine");
         } else if (viewInfo.botOffset > 0) {
@@ -315,7 +312,7 @@ class LinesView extends React.PureComponent<
         } else if (viewInfo.topOffset < 0) {
             linesElem.scrollTop = linesElem.scrollTop + viewInfo.topOffset + offsetDelta;
             this.ignoreNextScroll = true;
-            let newOffset = linesElem.clientHeight - viewInfo.height;
+            const newOffset = linesElem.clientHeight - viewInfo.height;
             screen.setAnchorFields(newLine, newOffset, "updateSelectedLine");
         } else {
             screen.setAnchorFields(newLine, viewInfo.anchorOffset, "updateSelectedLine");
@@ -325,7 +322,7 @@ class LinesView extends React.PureComponent<
 
     setLineVisible(lineNum: number, vis: boolean): void {
         mobx.action(() => {
-            let key = String(lineNum);
+            const key = String(lineNum);
             let visObj = this.visibleMap.get(key);
             if (visObj == null) {
                 visObj = mobx.observable.box(true, { name: "lines-vis-map" });
@@ -337,7 +334,7 @@ class LinesView extends React.PureComponent<
     }
 
     componentDidUpdate(prevProps, prevState, snapshot): void {
-        let { screen, lines } = this.props;
+        const { screen, lines } = this.props;
         if (screen.getSelectedLine() != this.lastSelectedLine) {
             this.updateSelectedLine();
             this.lastSelectedLine = screen.getSelectedLine();
@@ -353,11 +350,11 @@ class LinesView extends React.PureComponent<
     }
 
     handleResize(entries: ResizeObserverEntry[]) {
-        let linesElem = this.linesRef.current;
+        const linesElem = this.linesRef.current;
         if (linesElem == null) {
             return;
         }
-        let heightDiff = linesElem.offsetHeight - this.lastOffsetHeight;
+        const heightDiff = linesElem.offsetHeight - this.lastOffsetHeight;
         if (heightDiff != 0) {
             this.lastOffsetHeight = linesElem.offsetHeight;
             this.restoreAnchorOffset("resize");
@@ -383,30 +380,13 @@ class LinesView extends React.PureComponent<
         if (idx == 0) {
             return false;
         }
-        let curLineNumStr = String(lines[idx].linenum);
-        let prevLineNumStr = String(lines[idx - 1].linenum);
+        const curLineNumStr = String(lines[idx].linenum);
+        const prevLineNumStr = String(lines[idx - 1].linenum);
         return !this.collapsedMap.get(curLineNumStr).get() || !this.collapsedMap.get(prevLineNumStr).get();
     }
 
-    getDateSepStr(
-        lines: LineInterface[],
-        idx: number,
-        prevStr: string,
-        todayStr: string,
-        yesterdayStr: string
-    ): string {
-        let curLineDate = new Date(lines[idx].ts);
-        let curLineFormat = dayjs(curLineDate).format("ddd YYYY-MM-DD");
-        if (idx == 0) {
-            return;
-        }
-        let prevLineDate = new Date(lines[idx].ts);
-        let prevLineFormat = dayjs(prevLineDate).format("YYYY-MM-DD");
-        return null;
-    }
-
     findClosestLineIndex(lineNum: number): { line: LineInterface; index: number } {
-        let { lines } = this.props;
+        const { lines } = this.props;
         if (lines.length == 0) {
             throw new Error("invalid lines, cannot have 0 length in LinesView");
         }
@@ -416,7 +396,7 @@ class LinesView extends React.PureComponent<
         // todo: bsearch
         // lines is sorted by linenum
         for (let idx = 0; idx < lines.length; idx++) {
-            let line = lines[idx];
+            const line = lines[idx];
             if (line.linenum >= lineNum) {
                 return { line: line, index: idx };
             }
@@ -425,23 +405,21 @@ class LinesView extends React.PureComponent<
     }
 
     getAnchor(): { anchorLine: number; anchorOffset: number; anchorIndex: number } {
-        let { screen, lines } = this.props;
-        let anchor = screen.getAnchor();
+        const { screen, lines } = this.props;
+        const anchor = screen.getAnchor();
         if (anchor.anchorLine == null || anchor.anchorLine == 0) {
             return { anchorLine: lines[lines.length - 1].linenum, anchorOffset: 0, anchorIndex: lines.length - 1 };
         }
-        let lidx = this.findClosestLineIndex(anchor.anchorLine);
+        const lidx = this.findClosestLineIndex(anchor.anchorLine);
         if (lidx.line.linenum == anchor.anchorLine) {
             return { anchorLine: anchor.anchorLine, anchorOffset: anchor.anchorOffset, anchorIndex: lidx.index };
         }
         return { anchorLine: lidx.line.linenum, anchorOffset: 0, anchorIndex: lidx.index };
     }
     render() {
-        let { screen, width, lines, renderMode } = this.props;
-        let selectedLine = screen.getSelectedLine(); // for re-rendering
-        let line: LineInterface = null;
-        for (let i = 0; i < lines.length; i++) {
-            let key = String(lines[i].linenum);
+        const { width, lines, renderMode, lineFactory } = this.props;
+        for (const line of lines) {
+            let key = String(line.linenum);
             let visObs = this.visibleMap.get(key);
             if (visObs == null) {
                 this.visibleMap.set(key, mobx.observable.box(false, { name: "lines-vis-map" }));
@@ -451,25 +429,25 @@ class LinesView extends React.PureComponent<
                 this.collapsedMap.set(key, mobx.observable.box(false, { name: "lines-collapsed-map" }));
             }
         }
-        let lineElements: any = [];
-        let todayStr = util.getTodayStr();
-        let yesterdayStr = util.getYesterdayStr();
+        const lineElements: any = [];
+        const todayStr = util.getTodayStr();
+        const yesterdayStr = util.getYesterdayStr();
         let prevDateStr: string = null;
-        let anchor = this.getAnchor();
-        let startIdx = util.boundInt(anchor.anchorIndex - 50, 0, lines.length - 1);
-        let endIdx = util.boundInt(anchor.anchorIndex + 50, 0, lines.length - 1);
+        const anchor = this.getAnchor();
+        const startIdx = util.boundInt(anchor.anchorIndex - 50, 0, lines.length - 1);
+        const endIdx = util.boundInt(anchor.anchorIndex + 50, 0, lines.length - 1);
         // console.log("render", anchor, "[" + startIdx + "," + endIdx + "]");
         for (let idx = startIdx; idx <= endIdx; idx++) {
-            let line = lines[idx];
-            let lineNumStr = String(line.linenum);
+            const line = lines[idx];
+            const lineNumStr = String(line.linenum);
             let dateSepStr = null;
-            let curDateStr = lineutil.getLineDateStr(todayStr, yesterdayStr, line.ts);
+            const curDateStr = lineutil.getLineDateStr(todayStr, yesterdayStr, line.ts);
             if (curDateStr != prevDateStr) {
                 dateSepStr = curDateStr;
             }
             prevDateStr = curDateStr;
             if (dateSepStr != null) {
-                let sepElem = (
+                const sepElem = (
                     <div key={"sep-" + line.lineid} className="line-sep-labeled">
                         {dateSepStr}
                     </div>
@@ -478,8 +456,8 @@ class LinesView extends React.PureComponent<
             } else if (idx > 0) {
                 lineElements.push(<div key={"sep-" + line.lineid} className="line-sep"></div>);
             }
-            let topBorder = dateSepStr == null && this.hasTopBorder(lines, idx);
-            let lineProps = {
+            const topBorder = dateSepStr == null && this.hasTopBorder(lines, idx);
+            const lineProps = {
                 key: line.lineid,
                 line: line,
                 width: width,
@@ -490,11 +468,11 @@ class LinesView extends React.PureComponent<
                 topBorder: topBorder,
                 renderMode: renderMode,
             };
-            let lineElem = this.props.lineFactory(lineProps);
+            const lineElem = lineFactory(lineProps);
             // let lineElem = <Line key={line.lineid} line={line} screen={screen} width={width} visible={this.visibleMap.get(lineNumStr)} staticRender={this.staticRender.get()} onHeightChange={this.onHeightChange} overrideCollapsed={this.collapsedMap.get(lineNumStr)} topBorder={topBorder} renderMode={renderMode}/>;
             lineElements.push(lineElem);
         }
-        let linesClass = cn("lines", renderMode == "normal" ? "lines-expanded" : "lines-collapsed", "wide-scrollbar");
+        const linesClass = cn("lines", renderMode == "normal" ? "lines-expanded" : "lines-collapsed", "wide-scrollbar");
         return (
             <div key="lines" className={linesClass} onScroll={this.scrollHandler} ref={this.linesRef}>
                 <div className="lines-spacer"></div>
