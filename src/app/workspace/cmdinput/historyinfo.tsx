@@ -15,6 +15,7 @@ import { isBlank } from "@/util/util";
 
 import "./historyinfo.less";
 import { AuxiliaryCmdView } from "./auxview";
+import { ScrollbarsComponent } from "@/app/common/elements/scrollbars";
 
 dayjs.extend(localizedFormat);
 
@@ -153,6 +154,7 @@ class HistoryInfo extends React.Component<{}, {}> {
     lastClickHNum: string = null;
     lastClickTs: number = 0;
     containingText: mobx.IObservableValue<string> = mobx.observable.box("");
+    historyItemsRef: React.RefObject<HTMLDivElement> = React.createRef();
 
     componentDidMount() {
         const inputModel = GlobalModel.inputModel;
@@ -239,33 +241,39 @@ class HistoryInfo extends React.Component<{}, {}> {
         return (
             <AuxiliaryCmdView
                 title="History"
-                className="cmd-history hide-scrollbar"
+                className="cmd-history"
                 onClose={this.handleClose}
                 titleBarContents={this.getTitleBarContents()}
                 iconClass="fa-sharp fa-solid fa-clock-rotate-left"
             >
-                <div
-                    className={cn(
-                        "history-items",
-                        { "show-remotes": !opts.limitRemote },
-                        { "show-sessions": opts.queryType == "global" }
-                    )}
+                <ScrollbarsComponent
+                    childrenRef={this.historyItemsRef}
+                    options={{ scrollbars: { autoHide: "scroll" } }}
                 >
-                    <If condition={hitems.length == 0}>[no history]</If>
-                    <If condition={hitems.length > 0}>
-                        <For each="hitem" index="idx" of={hitems}>
-                            <HItem
-                                key={hitem.historyid}
-                                hitem={hitem}
-                                isSelected={hitem == selItem}
-                                opts={opts}
-                                snames={snames}
-                                scrNames={scrNames}
-                                onClick={this.handleItemClick}
-                            ></HItem>
-                        </For>
-                    </If>
-                </div>
+                    <div
+                        className={cn(
+                            "history-items",
+                            { "show-remotes": !opts.limitRemote },
+                            { "show-sessions": opts.queryType == "global" }
+                        )}
+                        ref={this.historyItemsRef}
+                    >
+                        <If condition={hitems.length == 0}>[no history]</If>
+                        <If condition={hitems.length > 0}>
+                            <For each="hitem" index="idx" of={hitems}>
+                                <HItem
+                                    key={hitem.historyid}
+                                    hitem={hitem}
+                                    isSelected={hitem == selItem}
+                                    opts={opts}
+                                    snames={snames}
+                                    scrNames={scrNames}
+                                    onClick={this.handleItemClick}
+                                ></HItem>
+                            </For>
+                        </If>
+                    </div>
+                </ScrollbarsComponent>
             </AuxiliaryCmdView>
         );
     }

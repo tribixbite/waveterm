@@ -11,6 +11,8 @@ import { Markdown } from "@/elements";
 import { AuxiliaryCmdView } from "./auxview";
 
 import "./aichat.less";
+import { UseOverlayScrollbarsInitialization, useOverlayScrollbars } from "overlayscrollbars-react";
+import { ScrollbarsComponent } from "@/app/common/elements/scrollbars";
 
 class AIChatKeybindings extends React.Component<{ AIChatObject: AIChat }, {}> {
     componentDidMount(): void {
@@ -70,7 +72,7 @@ class AIChat extends React.Component<{}, {}> {
 
     componentDidMount() {
         const inputModel = GlobalModel.inputModel;
-        if (this.chatWindowScrollRef != null && this.chatWindowScrollRef.current != null) {
+        if (this.chatWindowScrollRef?.current != null) {
             this.chatWindowScrollRef.current.scrollTop = this.chatWindowScrollRef.current.scrollHeight;
         }
         if (this.textAreaRef.current != null) {
@@ -82,7 +84,7 @@ class AIChat extends React.Component<{}, {}> {
     }
 
     componentDidUpdate() {
-        if (this.chatWindowScrollRef != null && this.chatWindowScrollRef.current != null) {
+        if (this.chatWindowScrollRef?.current != null) {
             this.chatWindowScrollRef.current.scrollTop = this.chatWindowScrollRef.current.scrollHeight;
         }
     }
@@ -258,11 +260,16 @@ class AIChat extends React.Component<{}, {}> {
                 <If condition={renderKeybindings}>
                     <AIChatKeybindings AIChatObject={this}></AIChatKeybindings>
                 </If>
-                <div className="chat-window" ref={this.chatWindowScrollRef}>
-                    <For each="chitem" index="idx" of={chatMessageItems}>
-                        {this.renderChatMessage(chitem)}
-                    </For>
-                </div>
+                <ScrollbarsComponent
+                    childrenRef={this.chatWindowScrollRef}
+                    options={{ scrollbars: { autoHide: "leave" } }}
+                >
+                    <div className="chat-window" ref={this.chatWindowScrollRef}>
+                        <For each="chitem" index="idx" of={chatMessageItems}>
+                            {this.renderChatMessage(chitem)}
+                        </For>
+                    </div>
+                </ScrollbarsComponent>
                 <div className="chat-input">
                     <textarea
                         key="main"
