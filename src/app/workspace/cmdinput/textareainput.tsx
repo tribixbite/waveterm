@@ -12,6 +12,8 @@ import { GlobalModel, GlobalCommandRunner, Screen } from "@/models";
 import { getMonoFontSize } from "@/util/textmeasure";
 import * as appconst from "@/app/appconst";
 import { Shell, getSuggestions } from "@/autocomplete";
+import { SuggestionBlob } from "@/autocomplete/runtime/model";
+import { Observer } from "mobx-react";
 
 type OV<T> = mobx.IObservableValue<T>;
 
@@ -39,8 +41,8 @@ function scrollDiv(div: any, amt: number) {
     div.scrollTo({ top: newScrollTop, behavior: "smooth" });
 }
 
-class HistoryKeybindings extends React.Component<{ inputObject: TextAreaInput }, {}> {
-    componentDidMount(): void {
+const HistoryKeybindings = () => {
+    React.useEffect(() => {
         if (GlobalModel.activeMainView != "session") {
             return;
         }
@@ -90,33 +92,44 @@ class HistoryKeybindings extends React.Component<{ inputObject: TextAreaInput },
             inputModel.moveHistorySelection(-1);
             return true;
         });
-    }
 
-    componentWillUnmount(): void {
-        GlobalModel.keybindManager.unregisterDomain("history");
-    }
+        return () => {
+            keybindManager.unregisterDomain("history");
+        };
+    });
 
-    render() {
-        return null;
-    }
+    return null;
+};
+
+interface TextAreaInputCallbacks {
+    arrowUpPressed: () => boolean;
+    arrowDownPressed: () => boolean;
+    scrollPage: (up: boolean) => void;
+    modEnter: () => void;
+    controlU: () => void;
+    controlP: () => void;
+    controlN: () => void;
+    controlW: () => void;
+    controlY: () => void;
+    setLastHistoryUpDown: (lastHistoryUpDown: boolean) => void;
 }
 
-class CmdInputKeybindings extends React.Component<{ inputObject: TextAreaInput }, {}> {
-    lastTab: boolean;
-    curPress: string;
+const CmdInputKeybindings = (props: { inputCallbacks: TextAreaInputCallbacks }) => {
+    const [lastTab, setLastTab] = React.useState(false);
+    const [curPress, setCurPress] = React.useState("");
 
-    componentDidMount() {
+    React.useEffect(() => {
         if (GlobalModel.activeMainView != "session") {
             return;
         }
-        const inputObject = this.props.inputObject;
-        this.lastTab = false;
+        const inputCallbacks = props.inputCallbacks;
+        setLastTab(false);
         const keybindManager = GlobalModel.keybindManager;
         const inputModel = GlobalModel.inputModel;
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:autocomplete", (waveEvent) => {
-            const lastTab = this.lastTab;
-            this.lastTab = true;
-            this.curPress = "tab";
+            const lastTab_ = lastTab;
+            setLastTab(true);
+            setCurPress("tab");
             const curLine = inputModel.getCurLine();
             // if (lastTab) {
             inputModel.getSuggestions().then(
@@ -164,15 +177,15 @@ class CmdInputKeybindings extends React.Component<{ inputObject: TextAreaInput }
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:cutLineLeftOfCursor", (waveEvent) => {
-            inputObject.controlU();
+            inputCallbacks.controlU();
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:cutWordLeftOfCursor", (waveEvent) => {
-            inputObject.controlW();
+            inputCallbacks.controlW();
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:paste", (waveEvent) => {
-            inputObject.controlY();
+            inputCallbacks.controlY();
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:openHistory", (waveEvent) => {
@@ -180,13 +193,13 @@ class CmdInputKeybindings extends React.Component<{ inputObject: TextAreaInput }
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:previousHistoryItem", (waveEvent) => {
-            this.curPress = "historyupdown";
-            inputObject.controlP();
+            setCurPress("historyupdown");
+            inputCallbacks.controlP();
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:nextHistoryItem", (waveEvent) => {
-            this.curPress = "historyupdown";
-            inputObject.controlN();
+            setCurPress("historyupdown");
+            inputCallbacks.controlN();
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "cmdinput:openAIChat", (waveEvent) => {
@@ -194,72 +207,69 @@ class CmdInputKeybindings extends React.Component<{ inputObject: TextAreaInput }
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "generic:selectAbove", (waveEvent) => {
-            this.curPress = "historyupdown";
-            const rtn = inputObject.arrowUpPressed();
+            setCurPress("historyupdown");
+            const rtn = inputCallbacks.arrowUpPressed();
             return rtn;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "generic:selectBelow", (waveEvent) => {
-            this.curPress = "historyupdown";
-            const rtn = inputObject.arrowDownPressed();
+            setCurPress("historyupdown");
+            const rtn = inputCallbacks.arrowDownPressed();
             return rtn;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "generic:selectPageAbove", (waveEvent) => {
-            this.curPress = "historyupdown";
-            inputObject.scrollPage(true);
+            setCurPress("historyupdown");
+            inputCallbacks.scrollPage(true);
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "generic:selectPageBelow", (waveEvent) => {
-            this.curPress = "historyupdown";
-            inputObject.scrollPage(false);
+            setCurPress("historyupdown");
+            inputCallbacks.scrollPage(false);
             return true;
         });
         keybindManager.registerKeybinding("pane", "cmdinput", "generic:expandTextInput", (waveEvent) => {
-            inputObject.modEnter();
+            inputCallbacks.modEnter();
             return true;
         });
         keybindManager.registerDomainCallback("cmdinput", (waveEvent) => {
-            if (this.curPress != "tab") {
-                this.lastTab = false;
+            if (curPress != "tab") {
+                setLastTab(false);
             }
-            if (this.curPress != "historyupdown") {
-                inputObject.lastHistoryUpDown = false;
+            if (curPress != "historyupdown") {
+                inputCallbacks.setLastHistoryUpDown(false);
             }
-            this.curPress = "";
+            setCurPress("");
             return false;
         });
-    }
 
-    componentWillUnmount() {
-        GlobalModel.keybindManager.unregisterDomain("cmdinput");
-    }
+        return () => {
+            keybindManager.unregisterDomain("cmdinput");
+        };
+    });
 
-    render() {
-        return null;
-    }
-}
+    return null;
+};
 
-@mobxReact.observer
-class TextAreaInput extends React.Component<{ screen: Screen; onHeightChange: () => void }, {}> {
-    lastTab: boolean = false;
-    lastHistoryUpDown: boolean = false;
-    lastTabCurLine: OV<string> = mobx.observable.box(null);
-    lastFocusType: string = null;
-    mainInputRef: React.RefObject<HTMLTextAreaElement> = React.createRef();
-    historyInputRef: React.RefObject<HTMLInputElement> = React.createRef();
-    controlRef: React.RefObject<HTMLDivElement> = React.createRef();
-    lastHeight: number = 0;
-    lastSP: StrWithPos = { str: "", pos: appconst.NoStrPos };
-    version: OV<number> = mobx.observable.box(0, { name: "textAreaInput-version" }); // forces render updates
+const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) => {
+    const [lastHistoryUpDown, setLastHistoryUpDown] = React.useState(false);
+    const [lastHeight, setLastHeight] = React.useState(0);
+    const [lastSP, setLastSP] = React.useState({ str: "", pos: appconst.NoStrPos });
+    const version: OV<number> = mobx.observable.box(0, { name: "textAreaInput-version" }); // forces render updates
+    const suggestions: OV<SuggestionBlob> = mobx.observable.box(null, { name: "textAreaInput-suggestions" });
+    const mainInputRef: React.RefObject<HTMLTextAreaElement> = React.useRef();
+    const historyInputRef: React.RefObject<HTMLInputElement> = React.useRef();
+    const controlRef: React.RefObject<HTMLDivElement> = React.useRef();
+    const activeScreen = GlobalModel.getActiveScreen();
+    const [curInput, setCurInput] = React.useState(GlobalModel.inputModel.getCurLine());
 
-    incVersion(): void {
-        const v = this.version.get();
-        mobx.action(() => this.version.set(v + 1))();
-    }
+    const incVersion = () => {
+        const v = version.get();
+        mobx.action(() => version.set(v + 1))();
+    };
 
-    getCurSP(): StrWithPos {
-        const textarea = this.mainInputRef.current;
+    const getCurSP = (): StrWithPos => {
+        const textarea = mainInputRef.current;
         if (textarea == null) {
-            return this.lastSP;
+            return lastSP;
         }
         const str = textarea.value;
         const pos = textarea.selectionStart;
@@ -268,23 +278,23 @@ class TextAreaInput extends React.Component<{ screen: Screen; onHeightChange: ()
             return { str, pos: appconst.NoStrPos };
         }
         return { str, pos };
-    }
+    };
 
-    updateSP(): void {
-        const curSP = this.getCurSP();
-        if (curSP.str == this.lastSP.str && curSP.pos == this.lastSP.pos) {
+    const updateSP = () => {
+        const curSP = getCurSP();
+        if (curSP.str == lastSP.str && curSP.pos == lastSP.pos) {
             return;
         }
-        this.lastSP = curSP;
-        GlobalModel.sendCmdInputText(this.props.screen.screenId, curSP);
-    }
+        setLastSP(curSP);
+        GlobalModel.sendCmdInputText(props.screen.screenId, curSP);
+    };
 
-    setFocus(): void {
+    const setFocus = () => {
         GlobalModel.inputModel.giveFocus();
-    }
+    };
 
-    getTextAreaMaxCols(): number {
-        const taElem = this.mainInputRef.current;
+    const getTextAreaMaxCols = (): number => {
+        const taElem = mainInputRef.current;
         if (taElem == null) {
             return 0;
         }
@@ -295,366 +305,343 @@ class TextAreaInput extends React.Component<{ screen: Screen; onHeightChange: ()
         const fontSize = getMonoFontSize(parseInt(cs.fontSize));
         const maxCols = Math.floor(contentWidth / Math.ceil(fontSize.width));
         return maxCols;
-    }
+    };
 
-    checkHeight(shouldFire: boolean): void {
-        const elem = this.controlRef.current;
+    const checkHeight = (shouldFire: boolean) => {
+        const elem = controlRef.current;
         if (elem == null) {
             return;
         }
         const curHeight = elem.offsetHeight;
-        if (this.lastHeight == curHeight) {
+        if (lastHeight == curHeight) {
             return;
         }
-        this.lastHeight = curHeight;
-        if (shouldFire && this.props.onHeightChange != null) {
-            this.props.onHeightChange();
+        setLastHeight(curHeight);
+        if (shouldFire && props.onHeightChange != null) {
+            props.onHeightChange();
         }
-    }
+    };
 
-    componentDidMount() {
-        const activeScreen = GlobalModel.getActiveScreen();
+    React.useEffect(() => {
         if (activeScreen != null) {
-            const focusType = activeScreen.focusType.get();
+            const focusType: FocusTypeStrs = activeScreen.focusType.get();
             if (focusType == "input") {
-                this.setFocus();
+                setFocus();
             }
-            this.lastFocusType = focusType;
         }
-        this.checkHeight(false);
-        this.updateSP();
-    }
+        checkHeight(false);
+        updateSP();
+    }, [curInput]);
 
-    componentDidUpdate() {
-        const activeScreen = GlobalModel.getActiveScreen();
-        if (activeScreen != null) {
-            const focusType = activeScreen.focusType.get();
-            if (this.lastFocusType != focusType && focusType == "input") {
-                this.setFocus();
-            }
-            this.lastFocusType = focusType;
-        }
+    React.useEffect(() => {
         const inputModel = GlobalModel.inputModel;
         const fcpos = inputModel.forceCursorPos.get();
         if (fcpos != null && fcpos != appconst.NoStrPos) {
-            if (this.mainInputRef.current != null) {
-                this.mainInputRef.current.selectionStart = fcpos;
-                this.mainInputRef.current.selectionEnd = fcpos;
+            if (mainInputRef.current != null) {
+                mainInputRef.current.selectionStart = fcpos;
+                mainInputRef.current.selectionEnd = fcpos;
             }
             mobx.action(() => inputModel.forceCursorPos.set(null))();
         }
         if (inputModel.forceInputFocus) {
             inputModel.forceInputFocus = false;
-            this.setFocus();
+            setFocus();
         }
-        this.checkHeight(true);
-        this.updateSP();
-    }
+    }, [GlobalModel.inputModel.forceCursorPos.get(), GlobalModel.inputModel.forceInputFocus]);
 
-    getLinePos(elem: any): { numLines: number; linePos: number } {
+    const getLinePos = (elem: any): { numLines: number; linePos: number } => {
         const numLines = elem.value.split("\n").length;
         const linePos = elem.value.substr(0, elem.selectionStart).split("\n").length;
         return { numLines, linePos };
-    }
+    };
 
-    arrowUpPressed(): boolean {
-        const inputModel = GlobalModel.inputModel;
-        if (!inputModel.isHistoryLoaded()) {
-            this.lastHistoryUpDown = true;
-            inputModel.loadHistory(false, 1, "screen");
-            return true;
-        }
-        const currentRef = this.mainInputRef.current;
-        if (currentRef == null) {
-            return true;
-        }
-        const linePos = this.getLinePos(currentRef);
-        const lastHist = this.lastHistoryUpDown;
-        if (!lastHist && linePos.linePos > 1) {
-            // regular arrow
-            return false;
-        }
-        inputModel.moveHistorySelection(1);
-        this.lastHistoryUpDown = true;
-        return true;
-    }
+    const onKeyDown = (e: any) => {};
 
-    arrowDownPressed(): boolean {
-        const inputModel = GlobalModel.inputModel;
-        if (!inputModel.isHistoryLoaded()) {
-            return true;
-        }
-        const currentRef = this.mainInputRef.current;
-        if (currentRef == null) {
-            return true;
-        }
-        const linePos = this.getLinePos(currentRef);
-        const lastHist = this.lastHistoryUpDown;
-        if (!lastHist && linePos.linePos < linePos.numLines) {
-            // regular arrow
-            return false;
-        }
-        inputModel.moveHistorySelection(-1);
-        this.lastHistoryUpDown = true;
-        return true;
-    }
-
-    scrollPage(up: boolean) {
-        const inputModel = GlobalModel.inputModel;
-        const infoScroll = inputModel.hasScrollingInfoMsg();
-        if (infoScroll) {
-            const div = document.querySelector(".cmd-input-info");
-            const amt = pageSize(div);
-            scrollDiv(div, up ? -amt : amt);
-        }
-    }
-
-    modEnter() {
-        const currentRef = this.mainInputRef.current;
-        if (currentRef == null) {
-            return;
-        }
-        currentRef.setRangeText("\n", currentRef.selectionStart, currentRef.selectionEnd, "end");
-        GlobalModel.inputModel.setCurLine(currentRef.value);
-    }
-
-    @mobx.action
-    @boundMethod
-    onKeyDown(e: any) {}
-
-    @boundMethod
-    onChange(e: any) {
+    const onChange = (e: any) => {
         mobx.action(() => {
             GlobalModel.inputModel.setCurLine(e.target.value);
+            setCurInput(e.target.value);
         })();
-    }
+    };
 
-    @boundMethod
-    onSelect(e: any) {
-        this.incVersion();
-    }
+    const onSelect = (e: any) => {
+        incVersion();
+    };
 
-    @boundMethod
-    onHistoryKeyDown(e: any) {}
+    const onHistoryKeyDown = (e: any) => {};
 
-    @boundMethod
-    controlU() {
-        if (this.mainInputRef.current == null) {
-            return;
-        }
-        const selStart = this.mainInputRef.current.selectionStart;
-        const value = this.mainInputRef.current.value;
-        if (selStart > value.length) {
-            return;
-        }
-        const cutValue = value.substring(0, selStart);
-        const restValue = value.substring(selStart);
-        const cmdLineUpdate = { str: restValue, pos: 0 };
-        navigator.clipboard.writeText(cutValue);
-        GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
-    }
-
-    @boundMethod
-    controlP() {
-        const inputModel = GlobalModel.inputModel;
-        if (!inputModel.isHistoryLoaded()) {
-            this.lastHistoryUpDown = true;
-            inputModel.loadHistory(false, 1, "screen");
-            return;
-        }
-        inputModel.moveHistorySelection(1);
-        this.lastHistoryUpDown = true;
-    }
-
-    @boundMethod
-    controlN() {
-        const inputModel = GlobalModel.inputModel;
-        inputModel.moveHistorySelection(-1);
-        this.lastHistoryUpDown = true;
-    }
-
-    @boundMethod
-    controlW() {
-        if (this.mainInputRef.current == null) {
-            return;
-        }
-        const selStart = this.mainInputRef.current.selectionStart;
-        const value = this.mainInputRef.current.value;
-        if (selStart > value.length) {
-            return;
-        }
-        let cutSpot = selStart - 1;
-        let initial = true;
-        for (; cutSpot >= 0; cutSpot--) {
-            const ch = value[cutSpot];
-            if (ch == " " && initial) {
-                continue;
-            }
-            initial = false;
-            if (ch == " ") {
-                cutSpot++;
-                break;
-            }
-        }
-        if (cutSpot == -1) {
-            cutSpot = 0;
-        }
-        const cutValue = value.slice(cutSpot, selStart);
-        const prevValue = value.slice(0, cutSpot);
-        const restValue = value.slice(selStart);
-        const cmdLineUpdate = { str: prevValue + restValue, pos: prevValue.length };
-        navigator.clipboard.writeText(cutValue);
-        GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
-    }
-
-    @boundMethod
-    controlY() {
-        if (this.mainInputRef.current == null) {
-            return;
-        }
-        const pastePromise = navigator.clipboard.readText();
-        pastePromise.then((clipText) => {
-            clipText = clipText ?? "";
-            const selStart = this.mainInputRef.current.selectionStart;
-            const selEnd = this.mainInputRef.current.selectionEnd;
-            const value = this.mainInputRef.current.value;
-            if (selStart > value.length || selEnd > value.length) {
-                return;
-            }
-            const newValue = value.substring(0, selStart) + clipText + value.substring(selEnd);
-            const cmdLineUpdate = { str: newValue, pos: selStart + clipText.length };
-            GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
-        });
-    }
-
-    @boundMethod
-    handleHistoryInput(e: any) {
+    const handleHistoryInput = (e: any) => {
         const inputModel = GlobalModel.inputModel;
         mobx.action(() => {
             const opts = mobx.toJS(inputModel.historyQueryOpts.get());
             opts.queryStr = e.target.value;
             inputModel.setHistoryQueryOpts(opts);
         })();
-    }
+    };
 
-    @boundMethod
-    handleFocus(e: any) {
+    const handleFocus = (e: any) => {
         e.preventDefault();
         GlobalModel.inputModel.giveFocus();
-    }
+    };
 
-    @boundMethod
-    handleMainBlur(e: any) {
-        if (document.activeElement == this.mainInputRef.current) {
+    const handleMainBlur = (e: any) => {
+        if (document.activeElement == mainInputRef.current) {
             return;
         }
         GlobalModel.inputModel.setPhysicalInputFocused(false);
-    }
+    };
 
-    @boundMethod
-    handleHistoryBlur(e: any) {
-        if (document.activeElement == this.historyInputRef.current) {
+    const handleHistoryBlur = (e: any) => {
+        if (document.activeElement == historyInputRef.current) {
             return;
         }
         GlobalModel.inputModel.setPhysicalInputFocused(false);
+    };
+
+    const model = GlobalModel;
+    const inputModel = model.inputModel;
+    const curLine = inputModel.getCurLine();
+    let displayLines = 1;
+    const numLines = curLine.split("\n").length;
+    const maxCols = getTextAreaMaxCols();
+    let longLine = false;
+    if (maxCols != 0 && curLine.length >= maxCols - 4) {
+        longLine = true;
+    }
+    if (numLines > 1 || longLine || inputModel.inputExpanded.get()) {
+        displayLines = 5;
     }
 
-    render() {
-        const model = GlobalModel;
-        const inputModel = model.inputModel;
-        const curLine = inputModel.getCurLine();
-        let displayLines = 1;
-        const numLines = curLine.split("\n").length;
-        const maxCols = this.getTextAreaMaxCols();
-        let longLine = false;
-        if (maxCols != 0 && curLine.length >= maxCols - 4) {
-            longLine = true;
+    const auxViewFocused = inputModel.getAuxViewFocus();
+    if (auxViewFocused) {
+        displayLines = 1;
+    }
+    if (activeScreen != null) {
+        activeScreen.focusType.get(); // for reaction
+    }
+    const termFontSize = GlobalModel.getTermFontSize();
+    const fontSize = getMonoFontSize(termFontSize);
+    const termPad = fontSize.pad;
+    const computedInnerHeight = displayLines * fontSize.height + 2 * termPad;
+    const computedOuterHeight = computedInnerHeight + 2 * termPad;
+    let shellType: string = "";
+    const screen = GlobalModel.getActiveScreen();
+    if (screen != null) {
+        const ri = screen.getCurRemoteInstance();
+        if (ri?.shelltype != null) {
+            shellType = ri.shelltype;
         }
-        if (numLines > 1 || longLine || inputModel.inputExpanded.get()) {
-            displayLines = 5;
-        }
-
-        const auxViewFocused = inputModel.getAuxViewFocus();
-        if (auxViewFocused) {
-            displayLines = 1;
-        }
-        const activeScreen = GlobalModel.getActiveScreen();
-        if (activeScreen != null) {
-            activeScreen.focusType.get(); // for reaction
-        }
-        const termFontSize = GlobalModel.getTermFontSize();
-        const fontSize = getMonoFontSize(termFontSize);
-        const termPad = fontSize.pad;
-        const computedInnerHeight = displayLines * fontSize.height + 2 * termPad;
-        const computedOuterHeight = computedInnerHeight + 2 * termPad;
-        let shellType: string = "";
-        const screen = GlobalModel.getActiveScreen();
-        if (screen != null) {
-            const ri = screen.getCurRemoteInstance();
-            if (ri?.shelltype != null) {
-                shellType = ri.shelltype;
-            }
-            if (shellType == "") {
-                const rptr = screen.curRemote.get();
-                if (rptr != null) {
-                    const remote = GlobalModel.getRemote(rptr.remoteid);
-                    if (remote != null) {
-                        shellType = remote.defaultshelltype;
-                    }
+        if (shellType == "") {
+            const rptr = screen.curRemote.get();
+            if (rptr != null) {
+                const remote = GlobalModel.getRemote(rptr.remoteid);
+                if (remote != null) {
+                    shellType = remote.defaultshelltype;
                 }
             }
         }
-        const isHistoryFocused = auxViewFocused && inputModel.getActiveAuxView() == appconst.InputAuxView_History;
-        return (
-            <div
-                className="textareainput-div control is-expanded"
-                ref={this.controlRef}
-                style={{ height: computedOuterHeight }}
-            >
-                <If condition={!auxViewFocused}>
-                    <CmdInputKeybindings inputObject={this}></CmdInputKeybindings>
-                </If>
-                <If condition={isHistoryFocused}>
-                    <HistoryKeybindings inputObject={this}></HistoryKeybindings>
-                </If>
-
-                <If condition={!util.isBlank(shellType)}>
-                    <div className="shelltag">{shellType}</div>
-                </If>
-                <textarea
-                    key="main"
-                    ref={this.mainInputRef}
-                    spellCheck="false"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    id="main-cmd-input"
-                    onFocus={this.handleFocus}
-                    onBlur={this.handleMainBlur}
-                    style={{ height: computedInnerHeight, minHeight: computedInnerHeight, fontSize: termFontSize }}
-                    value={curLine}
-                    onKeyDown={this.onKeyDown}
-                    onChange={this.onChange}
-                    onSelect={this.onSelect}
-                    placeholder="Type here..."
-                    className={cn("textarea", { "display-disabled": auxViewFocused })}
-                ></textarea>
-                <input
-                    key="history"
-                    ref={this.historyInputRef}
-                    spellCheck="false"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    className="history-input"
-                    type="text"
-                    onFocus={this.handleFocus}
-                    onBlur={this.handleHistoryBlur}
-                    onKeyDown={this.onHistoryKeyDown}
-                    onChange={this.handleHistoryInput}
-                    value={inputModel.historyQueryOpts.get().queryStr}
-                />
-            </div>
-        );
     }
-}
+    const isHistoryFocused = auxViewFocused && inputModel.getActiveAuxView() == appconst.InputAuxView_History;
+
+    const keybindingCallbacks: TextAreaInputCallbacks = {
+        arrowUpPressed: (): boolean => {
+            const inputModel = GlobalModel.inputModel;
+            if (!inputModel.isHistoryLoaded()) {
+                setLastHistoryUpDown(true);
+                inputModel.loadHistory(false, 1, "screen");
+                return true;
+            }
+            const currentRef = mainInputRef.current;
+            if (currentRef == null) {
+                return true;
+            }
+            const linePos = getLinePos(currentRef);
+            const lastHist = lastHistoryUpDown;
+            if (!lastHist && linePos.linePos > 1) {
+                // regular arrow
+                return false;
+            }
+            inputModel.moveHistorySelection(1);
+            setLastHistoryUpDown(true);
+            return true;
+        },
+        arrowDownPressed: (): boolean => {
+            const inputModel = GlobalModel.inputModel;
+            if (!inputModel.isHistoryLoaded()) {
+                return true;
+            }
+            const currentRef = mainInputRef.current;
+            if (currentRef == null) {
+                return true;
+            }
+            const linePos = getLinePos(currentRef);
+            const lastHist = lastHistoryUpDown;
+            if (!lastHist && linePos.linePos < linePos.numLines) {
+                // regular arrow
+                return false;
+            }
+            inputModel.moveHistorySelection(-1);
+            setLastHistoryUpDown(true);
+            return true;
+        },
+        scrollPage: (up: boolean) => {
+            const inputModel = GlobalModel.inputModel;
+            const infoScroll = inputModel.hasScrollingInfoMsg();
+            if (infoScroll) {
+                const div = document.querySelector(".cmd-input-info");
+                const amt = pageSize(div);
+                scrollDiv(div, up ? -amt : amt);
+            }
+        },
+        modEnter: () => {
+            const currentRef = mainInputRef.current;
+            if (currentRef == null) {
+                return;
+            }
+            currentRef.setRangeText("\n", currentRef.selectionStart, currentRef.selectionEnd, "end");
+            GlobalModel.inputModel.setCurLine(currentRef.value);
+        },
+        controlU: () => {
+            if (mainInputRef.current == null) {
+                return;
+            }
+            const selStart = mainInputRef.current.selectionStart;
+            const value = mainInputRef.current.value;
+            if (selStart > value.length) {
+                return;
+            }
+            const cutValue = value.substring(0, selStart);
+            const restValue = value.substring(selStart);
+            const cmdLineUpdate = { str: restValue, pos: 0 };
+            navigator.clipboard.writeText(cutValue);
+            GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
+        },
+        controlP: () => {
+            const inputModel = GlobalModel.inputModel;
+            if (!inputModel.isHistoryLoaded()) {
+                setLastHistoryUpDown(true);
+                inputModel.loadHistory(false, 1, "screen");
+                return;
+            }
+            inputModel.moveHistorySelection(1);
+            setLastHistoryUpDown(true);
+        },
+        controlN: () => {
+            const inputModel = GlobalModel.inputModel;
+            inputModel.moveHistorySelection(-1);
+            setLastHistoryUpDown(true);
+        },
+        controlW: () => {
+            if (mainInputRef.current == null) {
+                return;
+            }
+            const selStart = mainInputRef.current.selectionStart;
+            const value = mainInputRef.current.value;
+            if (selStart > value.length) {
+                return;
+            }
+            let cutSpot = selStart - 1;
+            let initial = true;
+            for (; cutSpot >= 0; cutSpot--) {
+                const ch = value[cutSpot];
+                if (ch == " " && initial) {
+                    continue;
+                }
+                initial = false;
+                if (ch == " ") {
+                    cutSpot++;
+                    break;
+                }
+            }
+            if (cutSpot == -1) {
+                cutSpot = 0;
+            }
+            const cutValue = value.slice(cutSpot, selStart);
+            const prevValue = value.slice(0, cutSpot);
+            const restValue = value.slice(selStart);
+            const cmdLineUpdate = { str: prevValue + restValue, pos: prevValue.length };
+            navigator.clipboard.writeText(cutValue);
+            GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
+        },
+        controlY: () => {
+            if (mainInputRef.current == null) {
+                return;
+            }
+            const pastePromise = navigator.clipboard.readText();
+            pastePromise.then((clipText) => {
+                clipText = clipText ?? "";
+                const selStart = mainInputRef.current.selectionStart;
+                const selEnd = mainInputRef.current.selectionEnd;
+                const value = mainInputRef.current.value;
+                if (selStart > value.length || selEnd > value.length) {
+                    return;
+                }
+                const newValue = value.substring(0, selStart) + clipText + value.substring(selEnd);
+                const cmdLineUpdate = { str: newValue, pos: selStart + clipText.length };
+                GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
+            });
+        },
+        setLastHistoryUpDown,
+    };
+    return (
+        <Observer>
+            {() => {
+                return (
+                    <div
+                        className="textareainput-div control is-expanded"
+                        ref={controlRef}
+                        style={{ height: computedOuterHeight }}
+                    >
+                        <If condition={!auxViewFocused}>
+                            <CmdInputKeybindings inputCallbacks={keybindingCallbacks} />
+                        </If>
+                        <If condition={isHistoryFocused}>
+                            <HistoryKeybindings />
+                        </If>
+
+                        <If condition={!util.isBlank(shellType)}>
+                            <div className="shelltag">{shellType}</div>
+                        </If>
+                        <textarea
+                            key="main"
+                            ref={mainInputRef}
+                            spellCheck="false"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            id="main-cmd-input"
+                            onFocus={handleFocus}
+                            onBlur={handleMainBlur}
+                            style={{
+                                height: computedInnerHeight,
+                                minHeight: computedInnerHeight,
+                                fontSize: termFontSize,
+                            }}
+                            value={curLine}
+                            onKeyDown={onKeyDown}
+                            onChange={onChange}
+                            onSelect={onSelect}
+                            placeholder="Type here..."
+                            className={cn("textarea", { "display-disabled": auxViewFocused })}
+                        />
+                        <input
+                            key="history"
+                            ref={historyInputRef}
+                            spellCheck="false"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            className="history-input"
+                            type="text"
+                            onFocus={handleFocus}
+                            onBlur={handleHistoryBlur}
+                            onKeyDown={onHistoryKeyDown}
+                            onChange={handleHistoryInput}
+                            value={inputModel.historyQueryOpts.get().queryStr}
+                        />
+                    </div>
+                );
+            }}
+        </Observer>
+    );
+};
 
 export { TextAreaInput };

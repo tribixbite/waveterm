@@ -6,9 +6,9 @@ import { GlobalModel } from "@/models";
 import cn from "classnames";
 import { useMemo } from "react";
 
-export const AutocompleteSuggestions = async () => {
+export const AutocompleteSuggestions = async (props: { curLine: string }) => {
     const inputModel = GlobalModel.inputModel;
-    const suggestions = await inputModel.getSuggestions();
+    const suggestions = await useMemo(async () => await inputModel.getSuggestions(), [props.curLine]);
 
     if (!suggestions) {
         return null;
@@ -17,7 +17,7 @@ export const AutocompleteSuggestions = async () => {
     const items = suggestions.suggestions.map((s) => `${s.icon} ${s.name}`);
 
     return (
-        <div className="autocomplete-dropdown">
+        <div className="autocomplete-suggestions">
             {items.map((item, idx) => (
                 <div key={idx} className={cn("autocomplete-item")}>
                     {item}

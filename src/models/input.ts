@@ -805,9 +805,9 @@ class InputModel {
     }
 
     getSuggestions(): Promise<SuggestionBlob> {
-        return useMemo(async () => {
-            return await getSuggestions(this.getCurLine(), GlobalModel.getCurRemoteInstance().festate.cwd, Shell.Zsh);
-        }, [this.historyIndex, this.modHistory]);
+        const festate = GlobalModel.getCurRemoteInstance().festate;
+
+        return getSuggestions(this.getCurLine(), festate.cwd, festate.shelltype as Shell);
     }
 
     getCurLine(): string {
