@@ -119,7 +119,7 @@ class CmdInputKeybindings extends React.Component<{ inputObject: TextAreaInput }
             this.curPress = "tab";
             const curLine = inputModel.getCurLine();
             // if (lastTab) {
-            getSuggestions(curLine, "~", Shell.Zsh).then(
+            inputModel.getSuggestions().then(
                 mobx.action((resp) => {
                     console.log("resp", resp);
                     inputModel.flashInfoMsg({ infotitle: resp?.suggestions[0].name }, 10000);

@@ -7,8 +7,11 @@ import { boundMethod } from "autobind-decorator";
 import { isBlank } from "@/util/util";
 import * as appconst from "@/app/appconst";
 import { Model } from "./model";
-import { GlobalCommandRunner } from "./global";
+import { GlobalCommandRunner, GlobalModel } from "./global";
 import { app } from "electron";
+import { SuggestionBlob } from "@/autocomplete/runtime/model";
+import { useMemo } from "react";
+import { Shell, getSuggestions } from "@/autocomplete";
 
 function getDefaultHistoryQueryOpts(): HistoryQueryOpts {
     return {
@@ -799,6 +802,12 @@ class InputModel {
             this.inputExpanded.set(!this.inputExpanded.get());
             this.forceInputFocus = true;
         })();
+    }
+
+    getSuggestions(): Promise<SuggestionBlob> {
+        return useMemo(async () => {
+            return await getSuggestions(this.getCurLine(), GlobalModel.getCurRemoteInstance().festate.cwd, Shell.Zsh);
+        }, [this.historyIndex, this.modHistory]);
     }
 
     getCurLine(): string {
