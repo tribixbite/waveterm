@@ -2,18 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from "react";
-import * as mobxReact from "mobx-react";
 import * as mobx from "mobx";
 import * as util from "@/util/util";
 import { If } from "tsx-control-statements/components";
-import { boundMethod } from "autobind-decorator";
 import cn from "classnames";
 import { GlobalModel, GlobalCommandRunner, Screen } from "@/models";
 import { getMonoFontSize } from "@/util/textmeasure";
 import * as appconst from "@/app/appconst";
-import { Shell, getSuggestions } from "@/autocomplete";
-import { SuggestionBlob } from "@/autocomplete/runtime/model";
 import { Observer } from "mobx-react";
+import { SuggestionBlob } from "@/autocomplete/runtime/model";
 
 type OV<T> = mobx.IObservableValue<T>;
 
@@ -253,31 +250,35 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
     const [lastHistoryUpDown, setLastHistoryUpDown] = React.useState(false);
     const [lastHeight, setLastHeight] = React.useState(0);
     const [lastSP, setLastSP] = React.useState({ str: "", pos: appconst.NoStrPos });
-    const version: OV<number> = mobx.observable.box(0, { name: "textAreaInput-version" }); // forces render updates
-    const suggestions: OV<SuggestionBlob> = mobx.observable.box(null, { name: "textAreaInput-suggestions" });
-    const mainInputRef: React.RefObject<HTMLTextAreaElement> = React.useRef();
+    const mainInputRef: React.RefObject<HTMLDivElement> = React.useRef();
     const historyInputRef: React.RefObject<HTMLInputElement> = React.useRef();
     const controlRef: React.RefObject<HTMLDivElement> = React.useRef();
     const activeScreen = GlobalModel.getActiveScreen();
+    // Local state for the current input value
     const [curInput, setCurInput] = React.useState(GlobalModel.inputModel.getCurLine());
+    const [suggestions, setSuggestions] = React.useState<SuggestionBlob>(null);
+    const inputModel = GlobalModel.inputModel;
 
-    const incVersion = () => {
-        const v = version.get();
-        mobx.action(() => version.set(v + 1))();
+    const getSelection = (elem: HTMLElement): { text: string; startPos: number; endPos: number } => {
+        if (elem == null) {
+            return { text: "", startPos: 0, endPos: 0 };
+        }
+        const text = elem.textContent;
+        const selection = window.getSelection();
+        if (selection == null || selection.anchorNode != elem) {
+            return { text: "", startPos: 0, endPos: 0 };
+        }
+        const startPos = selection.anchorOffset;
+        const endPos = selection.focusOffset;
+        return { text, startPos, endPos };
     };
 
     const getCurSP = (): StrWithPos => {
-        const textarea = mainInputRef.current;
-        if (textarea == null) {
-            return lastSP;
+        const { text, startPos, endPos } = getSelection(mainInputRef.current);
+        if (text == null || startPos != endPos) {
+            return { str: "", pos: appconst.NoStrPos };
         }
-        const str = textarea.value;
-        const pos = textarea.selectionStart;
-        const endPos = textarea.selectionEnd;
-        if (pos != endPos) {
-            return { str, pos: appconst.NoStrPos };
-        }
-        return { str, pos };
+        return { str: text, pos: startPos };
     };
 
     const updateSP = () => {
@@ -322,32 +323,73 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
         }
     };
 
-    React.useEffect(() => {
-        if (activeScreen != null) {
-            const focusType: FocusTypeStrs = activeScreen.focusType.get();
-            if (focusType == "input") {
-                setFocus();
-            }
-        }
-        checkHeight(false);
-        updateSP();
-    }, [curInput]);
+    // Called whenever the component is mounted or updated
+    React.useEffect(
+        () =>
+            mobx.autorun(() => {
+                console.log("TextAreaInput useEffect");
 
+                // Set the local state to the current input value
+                setCurInput(GlobalModel.inputModel.getCurLine());
+                if (activeScreen != null) {
+                    const focusType: FocusTypeStrs = activeScreen.focusType.get();
+                    if (focusType == "input") {
+                        setFocus();
+                    }
+                }
+                checkHeight(false);
+                updateSP();
+            }),
+        []
+    );
+
+    // Sets the focus on the input element when the forceInputFocus flag is set
     React.useEffect(() => {
-        const inputModel = GlobalModel.inputModel;
-        const fcpos = inputModel.forceCursorPos.get();
-        if (fcpos != null && fcpos != appconst.NoStrPos) {
-            if (mainInputRef.current != null) {
-                mainInputRef.current.selectionStart = fcpos;
-                mainInputRef.current.selectionEnd = fcpos;
-            }
-            mobx.action(() => inputModel.forceCursorPos.set(null))();
-        }
         if (inputModel.forceInputFocus) {
             inputModel.forceInputFocus = false;
             setFocus();
         }
-    }, [GlobalModel.inputModel.forceCursorPos.get(), GlobalModel.inputModel.forceInputFocus]);
+    }, [inputModel.forceInputFocus]);
+
+    // Called whenever the input cursor position is forced to change
+    React.useEffect(
+        () =>
+            mobx.autorun(() => {
+                const inputModel = GlobalModel.inputModel;
+                const fcpos = inputModel.forceCursorPos.get();
+                if (fcpos != null && fcpos != appconst.NoStrPos) {
+                    if (mainInputRef.current != null) {
+                        const selectRange = document.createRange();
+                        selectRange.setStart(mainInputRef.current, fcpos);
+                        selectRange.setEnd(mainInputRef.current, fcpos);
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(selectRange);
+                    }
+                    mobx.action(() => inputModel.forceCursorPos.set(null))();
+                }
+            }),
+        []
+    );
+
+    // Asynchronously load autocomplete suggestions when the input changes
+    React.useEffect(() => {
+        let active = true;
+
+        const loadSuggestions = async () => {
+            const inputModel = GlobalModel.inputModel;
+            const suggestions = await inputModel.getSuggestions();
+            if (!active) {
+                return;
+            }
+            setSuggestions(suggestions);
+        };
+
+        loadSuggestions();
+        return () => {
+            active = false;
+        };
+    }, [curInput]);
 
     const getLinePos = (elem: any): { numLines: number; linePos: number } => {
         const numLines = elem.value.split("\n").length;
@@ -355,20 +397,12 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
         return { numLines, linePos };
     };
 
-    const onKeyDown = (e: any) => {};
-
     const onChange = (e: any) => {
         mobx.action(() => {
             GlobalModel.inputModel.setCurLine(e.target.value);
             setCurInput(e.target.value);
         })();
     };
-
-    const onSelect = (e: any) => {
-        incVersion();
-    };
-
-    const onHistoryKeyDown = (e: any) => {};
 
     const handleHistoryInput = (e: any) => {
         const inputModel = GlobalModel.inputModel;
@@ -398,14 +432,12 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
         GlobalModel.inputModel.setPhysicalInputFocused(false);
     };
 
-    const model = GlobalModel;
-    const inputModel = model.inputModel;
-    const curLine = inputModel.getCurLine();
     let displayLines = 1;
-    const numLines = curLine.split("\n").length;
+
+    const numLines = curInput.split("\n").length;
     const maxCols = getTextAreaMaxCols();
     let longLine = false;
-    if (maxCols != 0 && curLine.length >= maxCols - 4) {
+    if (maxCols != 0 && curInput.length >= maxCols - 4) {
         longLine = true;
     }
     if (numLines > 1 || longLine || inputModel.inputExpanded.get()) {
@@ -425,14 +457,13 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
     const computedInnerHeight = displayLines * fontSize.height + 2 * termPad;
     const computedOuterHeight = computedInnerHeight + 2 * termPad;
     let shellType: string = "";
-    const screen = GlobalModel.getActiveScreen();
     if (screen != null) {
-        const ri = screen.getCurRemoteInstance();
+        const ri = activeScreen.getCurRemoteInstance();
         if (ri?.shelltype != null) {
             shellType = ri.shelltype;
         }
         if (shellType == "") {
-            const rptr = screen.curRemote.get();
+            const rptr = activeScreen.curRemote.get();
             if (rptr != null) {
                 const remote = GlobalModel.getRemote(rptr.remoteid);
                 if (remote != null) {
@@ -498,20 +529,18 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
             if (currentRef == null) {
                 return;
             }
-            currentRef.setRangeText("\n", currentRef.selectionStart, currentRef.selectionEnd, "end");
-            GlobalModel.inputModel.setCurLine(currentRef.value);
+            GlobalModel.inputModel.setCurLine(currentRef.textContent);
         },
         controlU: () => {
             if (mainInputRef.current == null) {
                 return;
             }
-            const selStart = mainInputRef.current.selectionStart;
-            const value = mainInputRef.current.value;
-            if (selStart > value.length) {
+            const { text, startPos, endPos } = getSelection(mainInputRef.current);
+            if (startPos > text.length) {
                 return;
             }
-            const cutValue = value.substring(0, selStart);
-            const restValue = value.substring(selStart);
+            const cutValue = text.substring(0, startPos);
+            const restValue = text.substring(startPos);
             const cmdLineUpdate = { str: restValue, pos: 0 };
             navigator.clipboard.writeText(cutValue);
             GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
@@ -535,15 +564,14 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
             if (mainInputRef.current == null) {
                 return;
             }
-            const selStart = mainInputRef.current.selectionStart;
-            const value = mainInputRef.current.value;
-            if (selStart > value.length) {
+            const { text, startPos, endPos } = getSelection(mainInputRef.current);
+            if (startPos > text.length) {
                 return;
             }
-            let cutSpot = selStart - 1;
+            let cutSpot = startPos - 1;
             let initial = true;
             for (; cutSpot >= 0; cutSpot--) {
-                const ch = value[cutSpot];
+                const ch = text[cutSpot];
                 if (ch == " " && initial) {
                     continue;
                 }
@@ -556,9 +584,9 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
             if (cutSpot == -1) {
                 cutSpot = 0;
             }
-            const cutValue = value.slice(cutSpot, selStart);
-            const prevValue = value.slice(0, cutSpot);
-            const restValue = value.slice(selStart);
+            const cutValue = text.slice(cutSpot, startPos);
+            const prevValue = text.slice(0, cutSpot);
+            const restValue = text.slice(startPos);
             const cmdLineUpdate = { str: prevValue + restValue, pos: prevValue.length };
             navigator.clipboard.writeText(cutValue);
             GlobalModel.inputModel.updateCmdLine(cmdLineUpdate);
@@ -570,9 +598,10 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
             const pastePromise = navigator.clipboard.readText();
             pastePromise.then((clipText) => {
                 clipText = clipText ?? "";
-                const selStart = mainInputRef.current.selectionStart;
-                const selEnd = mainInputRef.current.selectionEnd;
-                const value = mainInputRef.current.value;
+                const { text, startPos, endPos } = getSelection(mainInputRef.current);
+                const selStart = startPos;
+                const selEnd = endPos;
+                const value = text;
                 if (selStart > value.length || selEnd > value.length) {
                     return;
                 }
@@ -602,27 +631,37 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
                         <If condition={!util.isBlank(shellType)}>
                             <div className="shelltag">{shellType}</div>
                         </If>
-                        <textarea
+                        <div
+                            contentEditable={true}
                             key="main"
                             ref={mainInputRef}
                             spellCheck="false"
-                            autoComplete="off"
                             autoCorrect="off"
                             id="main-cmd-input"
                             onFocus={handleFocus}
                             onBlur={handleMainBlur}
+                            onChange={onChange}
+                            className={cn("textarea", { "display-disabled": auxViewFocused })}
                             style={{
                                 height: computedInnerHeight,
                                 minHeight: computedInnerHeight,
                                 fontSize: termFontSize,
                             }}
-                            value={curLine}
-                            onKeyDown={onKeyDown}
-                            onChange={onChange}
-                            onSelect={onSelect}
-                            placeholder="Type here..."
-                            className={cn("textarea", { "display-disabled": auxViewFocused })}
-                        />
+                        >
+                            {curInput}
+                        </div>
+                        <If condition={suggestions != null && suggestions.suggestions.length > 0}>
+                            <span
+                                className="suggestion"
+                                style={{
+                                    height: computedInnerHeight,
+                                    minHeight: computedInnerHeight,
+                                    fontSize: termFontSize,
+                                }}
+                            >
+                                {suggestions.suggestions[0].name}
+                            </span>
+                        </If>
                         <input
                             key="history"
                             ref={historyInputRef}
@@ -633,7 +672,6 @@ const TextAreaInput = (props: { screen: Screen; onHeightChange: () => void }) =>
                             type="text"
                             onFocus={handleFocus}
                             onBlur={handleHistoryBlur}
-                            onKeyDown={onHistoryKeyDown}
                             onChange={handleHistoryInput}
                             value={inputModel.historyQueryOpts.get().queryStr}
                         />

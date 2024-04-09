@@ -92,6 +92,8 @@
 
             .textareainput-div {
                 position: relative;
+                display: flex;
+                flex-direction: column;
 
                 &.control {
                     padding: var(--termpad) 0;
@@ -121,6 +123,11 @@
                 font-size: var(--termfontsize);
                 border: none;
                 box-shadow: none;
+                width: fit-content;
+            }
+
+            .suggestion {
+                width: fit-content;
             }
 
             input.history-input {
