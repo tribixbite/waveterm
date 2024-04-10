@@ -1,8 +1,7 @@
 import * as React from "react";
 import * as mobx from "mobx";
-import * as electron from "electron";
-import { parse } from "node:path";
 import { v4 as uuidv4 } from "uuid";
+import { Model } from "@/models";
 import defaultKeybindingsFile from "../../assets/default-keybindings.json";
 const defaultKeybindings: KeybindConfigArray = defaultKeybindingsFile;
 
@@ -52,7 +51,7 @@ class KeybindManager {
     activeKeybindsVersion: OV<number>;
     lastKeyData: { domain: string; keyPress: string };
 
-    constructor(GlobalModel: any) {
+    constructor(GlobalModel: Model) {
         this.levelMap = new Map();
         this.domainCallbacks = new Map();
         this.levelArray = KeybindLevels;
