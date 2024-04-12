@@ -9,6 +9,7 @@ import { CSVRenderer } from "./csv/csv";
 import { OpenAIRenderer, OpenAIRendererModel } from "./openai/openai";
 import { SimplePdfRenderer } from "./pdf/pdf";
 import { SimpleMediaRenderer } from "./media/media";
+import { WaveAppRenderer, WaveAppRendererModel } from "./waveapp/waveapp";
 import { isBlank } from "@/util/util";
 import { sprintf } from "sprintf-js";
 
@@ -99,6 +100,18 @@ const PluginConfigs: RendererPluginType[] = [
         globalCss: null,
         mimeTypes: ["video/*", "audio/*"],
         simpleComponent: SimpleMediaRenderer,
+    },
+    {
+        name: "waveapp",
+        rendererType: "full",
+        heightType: "pixels",
+        dataType: "model",
+        collapseType: "remove",
+        hidePrompt: true,
+        globalCss: null,
+        mimeTypes: ["application/x-waveapp"],
+        fullComponent: WaveAppRenderer,
+        modelCtor: () => new WaveAppRendererModel(),
     },
 ];
 

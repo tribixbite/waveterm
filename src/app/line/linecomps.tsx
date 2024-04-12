@@ -291,10 +291,10 @@ class LineHeader extends React.Component<{ screen: LineContainerType; line: Line
                 </div>
                 <If condition={!isBlank(renderer) && renderer != "terminal"}>
                     <div className="meta-divider">|</div>
-                    <div className="renderer">
+                    <div className="renderer-icon">
                         <i className="fa-sharp fa-solid fa-fill renderer-icon" />
-                        {renderer}
                     </div>
+                    <div className="renderer-name">{renderer}</div>
                 </If>
             </div>
         );

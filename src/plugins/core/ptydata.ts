@@ -129,4 +129,56 @@ class PacketDataBuffer extends PtyDataBuffer {
     }
 }
 
-export { PtyDataBuffer, PacketDataBuffer };
+class JsonLinesDataBuffer extends PtyDataBuffer {
+    parsePos: number;
+    callback: (any) => void;
+
+    constructor(callback: (any) => void) {
+        super();
+        this.parsePos = 0;
+        this.callback = callback;
+    }
+
+    reset(): void {
+        super.reset();
+        this.parsePos = 0;
+    }
+
+    processLine(line: string) {
+        if (line.length == 0) {
+            return;
+        }
+        let jsonVal: any = null;
+        try {
+            jsonVal = JSON.parse(line.trim());
+        } catch (e) {
+            console.log("invalid json", line, e);
+            return;
+        }
+        if (jsonVal != null) {
+            this.callback(jsonVal);
+        }
+    }
+
+    parseData() {
+        for (let i = this.parsePos; i < this.dataSize; i++) {
+            let ch = this.rawData[i];
+            if (ch == NewLineCharCode) {
+                // line does *not* include the newline
+                let line = new TextDecoder().decode(
+                    new Uint8Array(this.rawData.buffer, this.parsePos, i - this.parsePos)
+                );
+                this.parsePos = i + 1;
+                this.processLine(line);
+            }
+        }
+        return;
+    }
+
+    receiveData(pos: number, data: Uint8Array, reason?: string): void {
+        super.receiveData(pos, data, reason);
+        this.parseData();
+    }
+}
+
+export { PtyDataBuffer, PacketDataBuffer, JsonLinesDataBuffer };
