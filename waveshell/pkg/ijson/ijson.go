@@ -22,44 +22,10 @@ const (
 	AppendCommandStr = "append"
 )
 
-var _ = CommandType(SetCommand{})
-var _ = CommandType(DelCommand{})
-var _ = CommandType(AppendCommand{})
-
-type CommandType interface {
-	GetCommandType() string
-}
-
-type SetCommand struct {
-	Type string `json:"type"` // "set"
-	Path []any  `json:"path"` // each path entry must be either a string or int
-	Data any    `json:"data"` // data must be a valid JSON structure
-}
-
-func (c SetCommand) GetCommandType() string {
-	return SetCommandStr
-}
-
-// removes values from the state
-type DelCommand struct {
-	Type string `json:"type"` // "del"
-	Path []any  `json:"path"`
-}
-
-func (c DelCommand) GetCommandType() string {
-	return DelCommandStr
-}
-
-// appends to an array
-type AppendCommand struct {
-	Type string `json:"type"` // "append"
-	Path []any  `json:"path"`
-	Data any    `json:"data"`
-}
-
-func (c AppendCommand) GetCommandType() string {
-	return AppendCommandStr
-}
+// instead of defining structs for commands, we just define a command shape
+// set: type, path, value
+// del: type, path
+// arrayappend: type, path, value
 
 type PathError struct {
 	Err string
@@ -498,15 +464,50 @@ func DeepEqual(v1 any, v2 any) bool {
 	}
 }
 
-func ApplyCommand(data any, command CommandType, budget int) (any, error) {
-	switch command := command.(type) {
-	case SetCommand:
-		return SetPath(data, command.Path, command.Data, &SetPathOpts{Budget: budget})
-	case DelCommand:
-		return SetPath(data, command.Path, nil, &SetPathOpts{Remove: true, Budget: budget})
-	case AppendCommand:
-		return SetPath(data, command.Path, command.Data, &SetPathOpts{CombineFn: CombineFn_ArrayAppend, Budget: budget})
+func getCommandType(command map[string]any) string {
+	typeVal, ok := command["type"]
+	if !ok {
+		return ""
+	}
+	typeStr, ok := typeVal.(string)
+	if !ok {
+		return ""
+	}
+	return typeStr
+}
+
+func getCommandPath(command map[string]any) []any {
+	pathVal, ok := command["path"]
+	if !ok {
+		return nil
+	}
+	path, ok := pathVal.([]any)
+	if !ok {
+		return nil
+	}
+	return path
+}
+
+func ApplyCommand(data any, command any, budget int) (any, error) {
+	mapVal, ok := command.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("ApplyCommand: expected map, but got %T", command)
+	}
+	commandType := getCommandType(mapVal)
+	if commandType == "" {
+		return nil, fmt.Errorf("ApplyCommand: missing type field")
+	}
+	switch commandType {
+	case SetCommandStr:
+		path := getCommandPath(mapVal)
+		return SetPath(data, path, mapVal["data"], &SetPathOpts{Budget: budget})
+	case DelCommandStr:
+		path := getCommandPath(mapVal)
+		return SetPath(data, path, nil, &SetPathOpts{Remove: true, Budget: budget})
+	case AppendCommandStr:
+		path := getCommandPath(mapVal)
+		return SetPath(data, path, mapVal["data"], &SetPathOpts{CombineFn: CombineFn_ArrayAppend, Budget: budget})
 	default:
-		return nil, fmt.Errorf("unknown command type %T", command)
+		return nil, fmt.Errorf("ApplyCommand: unknown command type %q", commandType)
 	}
 }
