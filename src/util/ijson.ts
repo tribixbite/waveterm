@@ -4,6 +4,8 @@
 // ijson values are regular JSON values: string, number, boolean, null, object, array
 // path is an array of strings and numbers
 
+import * as mobx from "mobx";
+
 type PathType = (string | number)[];
 
 var simplePathStrRe = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -27,6 +29,14 @@ function formatPath(path: PathType): string {
     return pathStr;
 }
 
+function isArray(obj: any): boolean {
+    return obj != null && (Array.isArray(obj) || mobx.isObservableArray(obj));
+}
+
+function isObject(obj: any): boolean {
+    return obj != null && obj instanceof Object && !isArray(obj);
+}
+
 function getPath(obj: any, path: PathType): any {
     let cur = obj;
     for (let pathPart of path) {
@@ -34,13 +44,13 @@ function getPath(obj: any, path: PathType): any {
             return null;
         }
         if (typeof pathPart === "string") {
-            if (cur instanceof Object) {
+            if (isObject(cur)) {
                 cur = cur[pathPart];
             } else {
                 return null;
             }
         } else if (typeof pathPart === "number") {
-            if (Array.isArray(cur)) {
+            if (isArray(cur)) {
                 cur = cur[pathPart];
             } else {
                 return null;
@@ -55,7 +65,22 @@ function getPath(obj: any, path: PathType): any {
 type SetPathOpts = {
     force?: boolean;
     remove?: boolean;
+    combinefn?: (oldVal: any, newVal: any, opts: SetPathOpts) => any;
 };
+
+function combineFn_arrayAppend(oldVal: any, newVal: any, opts: SetPathOpts): any {
+    if (oldVal == null) {
+        return [newVal];
+    }
+    if (!isArray(oldVal) && !opts.force) {
+        throw new Error("Cannot append to non-array: " + oldVal);
+    }
+    if (!isArray(oldVal)) {
+        return [newVal];
+    }
+    oldVal.push(newVal);
+    return oldVal;
+}
 
 function setPath(obj: any, path: PathType, value: any, opts: SetPathOpts) {
     if (opts == null) {
@@ -64,14 +89,17 @@ function setPath(obj: any, path: PathType, value: any, opts: SetPathOpts) {
     if (opts.remove && value != null) {
         throw new Error("Cannot set value and remove at the same time");
     }
-    setPathInternal(obj, path, value, opts);
+    return setPathInternal(obj, path, value, opts);
 }
 
 function isEmpty(obj: any): boolean {
     if (obj == null) {
         return true;
     }
-    if (obj instanceof Object) {
+    if (isArray(obj)) {
+        return obj.length == 0;
+    }
+    if (isObject(obj)) {
         for (let key in obj) {
             return false;
         }
@@ -81,11 +109,15 @@ function isEmpty(obj: any): boolean {
 }
 
 function removeFromArr(arr: any[], idx: number): any[] {
+    console.log("removefromarray", arr, idx);
     if (idx >= arr.length) {
         return arr;
     }
     if (idx == arr.length - 1) {
         arr.pop();
+        if (arr.length == 0) {
+            return null;
+        }
         return arr;
     }
     arr[idx] = null;
@@ -94,6 +126,9 @@ function removeFromArr(arr: any[], idx: number): any[] {
 
 function setPathInternal(obj: any, path: PathType, value: any, opts: SetPathOpts): any {
     if (path.length == 0) {
+        if (opts.combinefn != null) {
+            return opts.combinefn(obj, value, opts);
+        }
         return value;
     }
     const pathPart = path[0];
@@ -104,7 +139,7 @@ function setPathInternal(obj: any, path: PathType, value: any, opts: SetPathOpts
             }
             obj = {};
         }
-        if (!(obj instanceof Object)) {
+        if (!isObject(obj)) {
             if (opts.force) {
                 obj = {};
             } else {
@@ -118,7 +153,7 @@ function setPathInternal(obj: any, path: PathType, value: any, opts: SetPathOpts
             }
             return obj;
         }
-        const newVal = setPath(obj[pathPart], path.slice(1), value, opts);
+        const newVal = setPathInternal(obj[pathPart], path.slice(1), value, opts);
         if (opts.remove && newVal == null) {
             delete obj[pathPart];
             if (isEmpty(obj)) {
@@ -127,6 +162,7 @@ function setPathInternal(obj: any, path: PathType, value: any, opts: SetPathOpts
             return obj;
         }
         obj[pathPart] = newVal;
+        return obj;
     } else if (typeof pathPart === "number") {
         if (pathPart < 0 || !Number.isInteger(pathPart)) {
             throw new Error("Invalid path part: " + pathPart);
@@ -137,7 +173,7 @@ function setPathInternal(obj: any, path: PathType, value: any, opts: SetPathOpts
             }
             obj = [];
         }
-        if (!Array.isArray(obj)) {
+        if (!isArray(obj)) {
             if (opts.force) {
                 obj = [];
             } else {
@@ -147,12 +183,16 @@ function setPathInternal(obj: any, path: PathType, value: any, opts: SetPathOpts
         if (opts.remove && path.length == 1) {
             return removeFromArr(obj, pathPart);
         }
-        const newVal = setPath(obj[pathPart], path.slice(1), value, opts);
+        const newVal = setPathInternal(obj[pathPart], path.slice(1), value, opts);
         if (opts.remove && newVal == null) {
             return removeFromArr(obj, pathPart);
         }
         obj[pathPart] = newVal;
+        return obj;
     } else {
         throw new Error("Invalid path part: " + pathPart);
     }
 }
+
+export type { PathType, SetPathOpts };
+export { getPath, setPath, combineFn_arrayAppend };
