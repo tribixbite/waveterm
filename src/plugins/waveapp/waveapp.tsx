@@ -9,6 +9,7 @@ import { boundMethod } from "autobind-decorator";
 import { JsonLinesDataBuffer } from "../core/ptydata";
 import { Markdown } from "@/elements";
 import * as ijson from "@/util/ijson";
+import Frame from "react-frame-component";
 
 import "./waveapp.less";
 
@@ -67,7 +68,7 @@ class WaveAppHtmlTag extends React.Component<{ node: WaveAppNode }, {}> {
                 }
             }
         }
-        let childrenComps = [];
+        let childrenComps: (string | JSX.Element)[] = [];
         if (children != null) {
             for (let idx = 0; idx < children.length; idx++) {
                 let comp = convertNodeToTag(children[idx], idx);
@@ -238,7 +239,7 @@ class WaveAppRenderer extends React.Component<{ model: WaveAppRendererModel }, {
         }
         return (
             <div className="waveapp-renderer" style={styleVal}>
-                {convertNodeToTag(node)}
+                <Frame>{convertNodeToTag(node)}</Frame>
             </div>
         );
     }
