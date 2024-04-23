@@ -258,7 +258,9 @@ class KeybindManager {
                 const sleepMsStr = curCommand.trim().replace("/sleep", "").trim();
                 const sleepMs = Number(sleepMsStr);
                 if (Number.isNaN(sleepMs)) {
-                    console.log("sleep error: couldn't parse arg");
+                    console.log(
+                        "sleep error: couldn't parse arg. Note that sleep commands currently cannot be chained in any way and need to be their own array element"
+                    );
                     return false;
                 }
                 setTimeout(() => {
