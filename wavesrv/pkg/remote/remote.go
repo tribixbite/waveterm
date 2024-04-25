@@ -3041,6 +3041,8 @@ func (msh *MShellProc) GetDisplayName() string {
 	return rcopy.GetName()
 }
 
+func (msh *MShellProc) RunPathExists(ctx context.Context)
+
 // Identify the screen for a given CommandKey and push the given status indicator update for that screen
 func pushStatusIndicatorUpdate(ck *base.CommandKey, level sstore.StatusIndicatorLevel) {
 	screenId := ck.GetGroupId()
