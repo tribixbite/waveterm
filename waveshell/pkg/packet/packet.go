@@ -67,6 +67,8 @@ const (
 	RpcInputPacketStr       = "rpcinput" // rpc-followup
 	SudoRequestPacketStr    = "sudorequest"
 	SudoResponsePacketStr   = "sudoresponse"
+	PathExistsPacketStr     = "pathexists"
+	ReadDirPacketStr        = "readdir"
 
 	OpenAIPacketStr   = "openai" // other
 	OpenAICloudReqStr = "openai-cloudreq"
@@ -124,6 +126,8 @@ func init() {
 	TypeStrToFactory[RpcInputPacketStr] = reflect.TypeOf(RpcInputPacketType{})
 	TypeStrToFactory[SudoRequestPacketStr] = reflect.TypeOf(SudoRequestPacketType{})
 	TypeStrToFactory[SudoResponsePacketStr] = reflect.TypeOf(SudoResponsePacketType{})
+	TypeStrToFactory[PathExistsPacketStr] = reflect.TypeOf(PathExistsPacketType{})
+	TypeStrToFactory[ReadDirPacketStr] = reflect.TypeOf(ReadDirPacketType{})
 
 	var _ RpcPacketType = (*RunPacketType)(nil)
 	var _ RpcPacketType = (*GetCmdPacketType)(nil)
@@ -133,6 +137,8 @@ func init() {
 	var _ RpcPacketType = (*ReInitPacketType)(nil)
 	var _ RpcPacketType = (*StreamFilePacketType)(nil)
 	var _ RpcPacketType = (*WriteFilePacketType)(nil)
+	var _ RpcPacketType = (*PathExistsPacketType)(nil)
+	var _ RpcPacketType = (*ReadDirPacketType)(nil)
 
 	var _ RpcResponsePacketType = (*CmdStartPacketType)(nil)
 	var _ RpcResponsePacketType = (*ResponsePacketType)(nil)
@@ -543,6 +549,35 @@ func (p *CompGenPacketType) GetReqId() string {
 
 func MakeCompGenPacket() *CompGenPacketType {
 	return &CompGenPacketType{Type: CompGenPacketStr}
+}
+
+type PathExistsPacketType struct {
+	Type  string `json:"type"`
+	ReqId string `json:"reqid"`
+	Path  string `json:"path"`
+}
+
+func (*PathExistsPacketType) GetType() string {
+	return PathExistsPacketStr
+}
+
+func (p *PathExistsPacketType) GetReqId() string {
+	return p.ReqId
+}
+
+type ReadDirPacketType struct {
+	Type     string `json:"type"`
+	ReqId    string `json:"reqid"`
+	Path     string `json:"path"`
+	OnlyDirs bool   `json:"onlydirs"`
+}
+
+func (*ReadDirPacketType) GetType() string {
+	return ReadDirPacketStr
+}
+
+func (p *ReadDirPacketType) GetReqId() string {
+	return p.ReqId
 }
 
 type ResponsePacketType struct {

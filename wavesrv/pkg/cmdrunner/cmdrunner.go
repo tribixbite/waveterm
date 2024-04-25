@@ -302,6 +302,8 @@ func init() {
 
 	registerCmdFn("autocomplete:on", AutocompleteOnCommand)
 	registerCmdFn("autocomplete:off", AutocompleteOffCommand)
+
+	registerCmdFn("testpath", TestPathCommand)
 }
 
 func getValidCommands() []string {
@@ -5791,6 +5793,29 @@ func ClientSetRightSidebarCommand(ctx context.Context, pk *scpacket.FeCommandPac
 	return update, nil
 }
 
+func PathExistsCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (scbus.UpdatePacket, error) {
+	if len(pk.Args) == 0 {
+		return nil, fmt.Errorf("/pathexists requires an argument (path)")
+	}
+	path := pk.Args[0]
+	ids, err := resolveUiIds(ctx, pk, R_Session|R_Screen|R_RemoteConnected)
+	if err != nil {
+		return nil, err
+	}
+	msh := ids.Remote.MShell
+	exists, err := msh.PathExists(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("/pathexists error: %v", err)
+	}
+	update := scbus.MakeUpdatePacket()
+	update.AddUpdate(sstore.InfoMsgUpdate("path %q exists: %v", path, exists))
+	return update, nil
+}
+
+func ReadDirCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (scbus.UpdatePacket, error) {
+
+}
+
 func validateOpenAIAPIToken(key string) error {
 	if len(key) > MaxOpenAIAPITokenLen {
 		return fmt.Errorf("invalid openai token, too long")
@@ -6317,6 +6342,10 @@ func ReleaseCheckCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) 
 	update := sstore.InfoMsgUpdate(rsp)
 	update.AddUpdate(*clientData)
 	return update, nil
+}
+
+func TestPathCommand(ctx context.Context, pk *scpacket.FeCommandPacketType) (scbus.UpdatePacket, error) {
+	return nil, fmt.Errorf("testpath command not implemented")
 }
 
 func formatTermOpts(termOpts sstore.TermOpts) string {

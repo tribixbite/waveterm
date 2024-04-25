@@ -703,6 +703,25 @@ func (m *MServer) ProcessRpcPacket(pk packet.RpcPacketType) {
 		go m.writeFile(writePk, wfc)
 		return
 	}
+	if pathExistsPk, ok := pk.(*packet.PathExistsPacketType); ok {
+		exists, err := utilfn.PathExists(pathExistsPk.Path)
+		if err != nil {
+			m.Sender.SendErrorResponse(reqId, fmt.Errorf("error checking path: %w", err))
+			return
+		}
+		m.Sender.SendResponse(reqId, exists)
+		return
+	}
+	if readDirPk, ok := pk.(*packet.ReadDirPacketType); ok {
+		entries, err := utilfn.ReadDir(readDirPk.Path, readDirPk.OnlyDirs)
+		if err != nil {
+			m.Sender.SendErrorResponse(reqId, fmt.Errorf("error reading directory: %w", err))
+			return
+		}
+		m.Sender.SendResponse(reqId, entries)
+		return
+	}
+
 	m.Sender.SendErrorResponse(reqId, fmt.Errorf("invalid rpc type '%s'", pk.GetType()))
 }
 
