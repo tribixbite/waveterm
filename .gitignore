@@ -22,3 +22,5 @@ test/
 .vscode/
 make/
 waveterm-builds.zip
+
+*storybook.log
