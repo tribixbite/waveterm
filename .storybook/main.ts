@@ -1,7 +1,6 @@
 import type { StorybookConfig } from "@storybook/react-webpack5";
 import { webProd, webDev } from "../webpack/webpack.web";
-import { electronProd, electronDev } from "../webpack/webpack.electron";
-const webpackMerge = require("webpack-merge");
+import { Configuration } from "webpack";
 
 const config: StorybookConfig = {
     stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
@@ -22,12 +21,29 @@ const config: StorybookConfig = {
         autodocs: "tag",
     },
     webpackFinal: (config, { configType }) => {
-        let configToMerge = electronDev;
+        let configToMerge = webDev;
         if (configType === "PRODUCTION") {
-            configToMerge = electronProd;
+            configToMerge = webProd;
         }
-        const ret = webpackMerge.merge(config, configToMerge);
-        console.log("config", ret);
+        const ret: Configuration = {
+            ...config,
+            entry: configToMerge.entry,
+            mode: configType === "PRODUCTION" ? "production" : "development",
+            module: { ...config.module, rules: [...(config.module?.rules ?? []), ...configToMerge.module.rules] },
+            resolve: {
+                ...config.resolve,
+                extensions: [...(config.resolve?.extensions ?? []), ...configToMerge.resolve.extensions],
+                alias: { ...config.resolve?.alias, ...configToMerge.resolve.alias },
+            },
+            plugins: [...(config.plugins ?? []), ...configToMerge.plugins],
+            devServer: configToMerge.devServer,
+            devtool: configToMerge.devtool,
+            output: {
+                ...config.output,
+                ...configToMerge.output,
+            },
+        };
+        console.log(JSON.stringify(ret, null, 4));
         return ret;
     },
 };

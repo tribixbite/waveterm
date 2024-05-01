@@ -1,7 +1,5 @@
 import type { Preview } from "@storybook/react";
 
-import "../public/themes/default.css";
-
 const preview: Preview = {
     parameters: {
         controls: {

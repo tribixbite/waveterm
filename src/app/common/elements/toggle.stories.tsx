@@ -10,9 +10,16 @@ const meta: Meta<typeof Toggle> = {
 export default meta;
 type Story = StoryObj<typeof Toggle>;
 
-export const Basic: Story = {
+export const Checked: Story = {
     args: {
         checked: true,
         onChange: () => {},
+    },
+};
+
+export const Unchecked: Story = {
+    args: {
+        ...Checked.args,
+        checked: false,
     },
 };
