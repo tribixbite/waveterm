@@ -81,6 +81,7 @@ var webCommon = {
         extensions: [".ts", ".tsx", ".js", ".mjs", ".cjs", ".wasm", ".json", ".less", ".css"],
         alias: {
             "@/app": path.resolve(__dirname, "../src/app/"),
+            "@/app2": path.resolve(__dirname, "../src/app2/"),
             "@/util": path.resolve(__dirname, "../src/util/"),
             "@/models": path.resolve(__dirname, "../src/models/"),
             "@/common": path.resolve(__dirname, "../src/app/common/"),

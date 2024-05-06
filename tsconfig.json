@@ -16,6 +16,7 @@
         "baseUrl": "./", 
         "paths": {
             "@/app/*": ["src/app/*"], // Points to the src folder
+            "@/app2/*": ["src/app2/*"], // Points to the src folder
             "@/util/*": ["src/util/*"], // Points to the src folder
             "@/models": ["src/models/index"], // Points directly to the index file
             "@/models/*": ["src/models/*"], // For everything else inside models

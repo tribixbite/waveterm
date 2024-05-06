@@ -6,9 +6,11 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { sprintf } from "sprintf-js";
 import { App } from "@/app/app";
+import { App2 } from "@/app2/app";
 import * as DOMPurify from "dompurify";
 import { loadFonts } from "@/util/fontutil";
 import * as textmeasure from "@/util/textmeasure";
+import { getApi } from "./models";
 
 // @ts-ignore
 let VERSION = __WAVETERM_VERSION__;
@@ -18,7 +20,12 @@ let BUILD = __WAVETERM_BUILD__;
 loadFonts();
 
 document.addEventListener("DOMContentLoaded", () => {
-    let reactElem = React.createElement(App, null, null);
+    let reactElem;
+    if (getApi().getWindowId() === 1) {
+        reactElem = React.createElement(App, null, null);
+    } else {
+        reactElem = React.createElement(App2, null, null);
+    }
     let elem = document.getElementById("app");
     let root = createRoot(elem);
     document.fonts.ready.then(() => {

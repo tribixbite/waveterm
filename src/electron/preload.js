@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("api", {
     hideWindow: () => ipc.Renderer.send("hide-window"),
     toggleDeveloperTools: () => ipcRenderer.send("toggle-developer-tools"),
     getId: () => ipcRenderer.sendSync("get-id"),
+    getWindowId: () => ipcRenderer.sendSync("get-window-id"),
     getPlatform: () => ipcRenderer.sendSync("get-platform"),
     getIsDev: () => ipcRenderer.sendSync("get-isdev"),
     getAuthKey: () => ipcRenderer.sendSync("get-authkey"),

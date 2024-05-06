@@ -943,6 +943,7 @@ declare global {
         hideWindow: () => void;
         toggleDeveloperTools: () => void;
         getId: () => string;
+        getWindowId: () => number;
         getIsDev: () => boolean;
         getPlatform: () => string;
         getAuthKey: () => string;

@@ -520,6 +520,10 @@ electron.ipcMain.on("get-id", (event) => {
     event.returnValue = instanceId + ":" + event.processId;
 });
 
+electron.ipcMain.on("get-window-id", (event) => {
+    event.returnValue = event.sender.id;
+});
+
 electron.ipcMain.on("get-platform", (event) => {
     event.returnValue = unamePlatform;
 });
@@ -984,6 +988,7 @@ function configureAutoUpdater(enabled: boolean) {
     }
     setTimeout(runActiveTimer, 5000); // start active timer, wait 5s just to be safe
     await app.whenReady();
+    await createWindowWrap();
     await createWindowWrap();
 
     app.on("activate", () => {
