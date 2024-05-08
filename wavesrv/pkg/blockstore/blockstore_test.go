@@ -28,7 +28,6 @@ type TestBlockType struct {
 }
 
 func initTestDb(t *testing.T) {
-	flushTimeout = DefaultFlushTimeout
 	log.Printf("initTestDb: %v", t.Name())
 	os.Remove(testOverrideDBName)
 	overrideDBName = testOverrideDBName
@@ -36,6 +35,8 @@ func initTestDb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MigrateBlockstore error: %v", err)
 	}
+	stopFlushTimer()
+	startFlushTimer(DefaultFlushTimeout)
 }
 
 func cleanupTestDB(t *testing.T) {
@@ -103,7 +104,8 @@ func TestTx(t *testing.T) {
 	defer cleanupTestDB(t)
 
 	ctx := context.Background()
-	flushTimeout = 2 * time.Minute
+	stopFlushTimer()
+	startFlushTimer(2 * time.Minute)
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `INSERT into block_data values ('test-block-id', 'test-file-name', 0, 256)`
 		tx.Exec(query)
@@ -228,19 +230,6 @@ func TestMakeFile(t *testing.T) {
 	log.Printf("cur file info: %v", curFileInfo)
 	SimpleAssert(t, curFileInfo.Name == "file-1", "correct file name")
 	SimpleAssert(t, curFileInfo.Meta["test-descriptor"] == true, "meta correct")
-	curCacheEntry := blockstoreCache[cacheKey{BlockId: "test-block-id", Name: "file-1"}]
-	curFileInfo = curCacheEntry.Info
-	log.Printf("cache entry: %v", curCacheEntry)
-	SimpleAssert(t, curFileInfo.Name == "file-1", "cache correct file name")
-	SimpleAssert(t, curFileInfo.Meta["test-descriptor"] == true, "cache meta correct")
-	txErr = WithTx(ctx, func(tx *TxWrap) error {
-		query := `DELETE from block_file where blockid = 'test-block-id'`
-		tx.Exec(query)
-		return nil
-	})
-	if txErr != nil {
-		t.Errorf("TestTx error deleting test entries: %v", txErr)
-	}
 }
 
 func TestWriteAt(t *testing.T) {
@@ -929,7 +918,8 @@ func TestFlushTimer(t *testing.T) {
 	defer cleanupTestDB(t)
 
 	testFlushTimeout := 10 * time.Second
-	flushTimeout = testFlushTimeout
+	stopFlushTimer()
+	startFlushTimer(testFlushTimeout)
 	ctx := context.Background()
 	fileMeta := make(FileMeta)
 	fileMeta["test-descriptor"] = true

@@ -63,6 +63,15 @@ type CacheBlock struct {
 	dirty bool
 }
 
+func InitBlockstore() error {
+	err := MigrateBlockstore()
+	if err != nil {
+		return err
+	}
+	startFlushTimer(DefaultFlushTimeout)
+	return nil
+}
+
 func MakeCacheEntry(info *FileInfo) *CacheEntry {
 	rtn := &CacheEntry{Lock: &sync.Mutex{}, CacheTs: int64(time.Now().UnixMilli()), Info: info, DataBlocks: []*CacheBlock{}, Refs: 0}
 	return rtn
@@ -86,8 +95,6 @@ type BlockStore interface {
 }
 
 var appendLock *sync.Mutex = &sync.Mutex{}
-var flushTimeout = DefaultFlushTimeout // this is a variable for testing
-var lastWriteTime time.Time
 
 // for testing
 func clearCache() {
@@ -318,28 +325,11 @@ func Stat(ctx context.Context, blockId string, name string) (*FileInfo, error) {
 	return DeepCopyFileInfo(fInfo), nil
 }
 
-func GetClockString(t time.Time) string {
-	hour, min, sec := t.Clock()
-	return fmt.Sprintf("%v:%v:%v", hour, min, sec)
-}
-
-func StartFlushTimer(ctx context.Context) {
-	curTime := time.Now()
-	writeTimePassed := curTime.UnixNano() - lastWriteTime.UnixNano()
-	if writeTimePassed >= int64(flushTimeout) {
-		lastWriteTime = curTime
-		go func() {
-			time.Sleep(flushTimeout)
-			FlushCache(ctx)
-		}()
-	}
-}
-
 func WriteAt(ctx context.Context, blockId string, name string, p []byte, off int64) (int, error) {
-	return WriteAtHelper(ctx, blockId, name, p, off, true)
+	return WriteAtHelper(ctx, blockId, name, p, off)
 }
 
-func WriteAtHelper(ctx context.Context, blockId string, name string, p []byte, off int64, flushCache bool) (int, error) {
+func WriteAtHelper(ctx context.Context, blockId string, name string, p []byte, off int64) (int, error) {
 	bytesToWrite := len(p)
 	bytesWritten := 0
 	curCacheNum := int(math.Floor(float64(off) / float64(PartSize)))
@@ -371,7 +361,7 @@ func WriteAtHelper(ctx context.Context, blockId string, name string, p []byte, o
 			if err.Error() == MaxSizeError {
 				if fInfo.Opts.Circular {
 					p = p[int64(b):]
-					b, err := WriteAtHelper(ctx, blockId, name, p, 0, false)
+					b, err := WriteAtHelper(ctx, blockId, name, p, 0)
 					bytesWritten += b
 					if err != nil {
 						return bytesWritten, fmt.Errorf("write to cache error: %v", err)
@@ -386,9 +376,6 @@ func WriteAtHelper(ctx context.Context, blockId string, name string, p []byte, o
 			break
 		}
 		p = p[int64(b):]
-	}
-	if flushCache {
-		StartFlushTimer(ctx)
 	}
 	return bytesWritten, nil
 }
