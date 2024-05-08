@@ -1,8 +1,10 @@
+// Copyright 2023, Command Line Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package blockstore
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -30,11 +32,13 @@ type FileInfo struct {
 	Meta      FileMeta
 }
 
-const UnitsKB = 1024 * 1024
-const UnitsMB = 1024 * UnitsKB
-const UnitsGB = 1024 * UnitsMB
+const (
+	UnitsKB = 1024 * 1024
+	UnitsMB = 1024 * UnitsKB
+	UnitsGB = 1024 * UnitsMB
+)
 
-const MaxBlockSize = int64(128 * UnitsKB)
+const PartSize = int64(128 * UnitsKB)
 const DefaultFlushTimeout = 1 * time.Second
 
 type CacheEntry struct {
@@ -81,64 +85,19 @@ type BlockStore interface {
 	GetAllBlockIds(ctx context.Context) []string
 }
 
-var blockstoreCache map[string]*CacheEntry = make(map[string]*CacheEntry)
-var globalLock *sync.Mutex = &sync.Mutex{}
 var appendLock *sync.Mutex = &sync.Mutex{}
-var flushTimeout = DefaultFlushTimeout
+var flushTimeout = DefaultFlushTimeout // this is a variable for testing
 var lastWriteTime time.Time
 
 // for testing
 func clearCache() {
 	globalLock.Lock()
 	defer globalLock.Unlock()
-	blockstoreCache = make(map[string]*CacheEntry)
+	blockstoreCache = make(map[cacheKey]*CacheEntry)
 }
 
-func InsertFileIntoDB(ctx context.Context, fileInfo FileInfo) error {
-	metaJson, err := json.Marshal(fileInfo.Meta)
-	if err != nil {
-		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, err)
-	}
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `INSERT INTO block_file VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-		tx.Exec(query, fileInfo.BlockId, fileInfo.Name, fileInfo.Opts.MaxSize, fileInfo.Opts.Circular, fileInfo.Size, fileInfo.CreatedTs, fileInfo.ModTs, metaJson)
-		return nil
-	})
-	if txErr != nil {
-		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, txErr)
-	}
-	return nil
-}
-
-func WriteFileToDB(ctx context.Context, fileInfo FileInfo) error {
-	metaJson, err := json.Marshal(fileInfo.Meta)
-	if err != nil {
-		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, err)
-	}
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `UPDATE block_file SET blockid = ?, name = ?, maxsize = ?, circular = ?, size = ?, createdts = ?, modts = ?, meta = ? where blockid = ? and name = ?`
-		tx.Exec(query, fileInfo.BlockId, fileInfo.Name, fileInfo.Opts.MaxSize, fileInfo.Opts.Circular, fileInfo.Size, fileInfo.CreatedTs, fileInfo.ModTs, metaJson, fileInfo.BlockId, fileInfo.Name)
-		return nil
-	})
-	if txErr != nil {
-		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, txErr)
-	}
-	return nil
-
-}
-
-func WriteDataBlockToDB(ctx context.Context, blockId string, name string, index int, data []byte) error {
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `REPLACE INTO block_data values (?, ?, ?, ?)`
-		tx.Exec(query, blockId, name, index, data)
-		return nil
-	})
-	if txErr != nil {
-		return fmt.Errorf("error writing data block to db: %v", txErr)
-	}
-	return nil
-}
-
+// synchronous -- write directly to DB (no cache)
+// the DB will return an error if two files are created at the same time (first wins)
 func MakeFile(ctx context.Context, blockId string, name string, meta FileMeta, opts FileOptsType) error {
 	curTs := time.Now().UnixMilli()
 	fileInfo := FileInfo{BlockId: blockId, Name: name, Size: 0, CreatedTs: curTs, ModTs: curTs, Opts: opts, Meta: meta}
@@ -146,8 +105,6 @@ func MakeFile(ctx context.Context, blockId string, name string, meta FileMeta, o
 	if err != nil {
 		return err
 	}
-	curCacheEntry := MakeCacheEntry(&fileInfo)
-	SetCacheEntry(ctx, GetCacheId(blockId, name), curCacheEntry)
 	return nil
 }
 
@@ -166,7 +123,7 @@ func WriteToCacheBlockNum(ctx context.Context, blockId string, name string, p []
 	var bytesWritten = 0
 	blockLen := len(block.data)
 	fileMaxSize := cacheEntry.Info.Opts.MaxSize
-	maxWriteSize := fileMaxSize - (int64(cacheNum) * MaxBlockSize)
+	maxWriteSize := fileMaxSize - (int64(cacheNum) * PartSize)
 	numLeftPad := int64(0)
 	if pos > blockLen {
 		numLeftPad = int64(pos - blockLen)
@@ -180,7 +137,7 @@ func WriteToCacheBlockNum(ctx context.Context, blockId string, name string, p []
 			return int64(b), b, err
 		}
 		numLeftPad = int64(b)
-		cacheEntry.Info.Size += (int64(cacheNum) * MaxBlockSize)
+		cacheEntry.Info.Size += (int64(cacheNum) * PartSize)
 	}
 	b, writeErr := WriteToCacheBuf(&block.data, p, pos, length, maxWriteSize)
 	bytesWritten += b
@@ -232,7 +189,7 @@ func WriteToCacheBuf(buf *[]byte, p []byte, pos int, length int, maxWrite int64)
 	if pos > len(*buf) {
 		return 0, fmt.Errorf("writing to a position (%v) in the cache that doesn't exist yet, something went wrong", pos)
 	}
-	if int64(pos+bytesToWrite) > MaxBlockSize {
+	if int64(pos+bytesToWrite) > PartSize {
 		return 0, fmt.Errorf("writing more bytes than max block size, not allowed - length of bytes to write: %v, length of cache: %v", bytesToWrite, len(*buf))
 	}
 	for index := pos; index < bytesToWrite+pos; index++ {
@@ -252,10 +209,6 @@ func WriteToCacheBuf(buf *[]byte, p []byte, pos int, length int, maxWrite int64)
 	return bytesToWrite, nil
 }
 
-func GetCacheId(blockId string, name string) string {
-	return blockId + "~SEP~" + name
-}
-
 func GetValuesFromCacheId(cacheId string) (blockId string, name string) {
 	vals := strings.Split(cacheId, "~SEP~")
 	if len(vals) == 2 {
@@ -269,7 +222,7 @@ func GetValuesFromCacheId(cacheId string) (blockId string, name string) {
 func GetCacheEntry(ctx context.Context, blockId string, name string) (*CacheEntry, bool) {
 	globalLock.Lock()
 	defer globalLock.Unlock()
-	if curCacheEntry, found := blockstoreCache[GetCacheId(blockId, name)]; found {
+	if curCacheEntry, found := blockstoreCache[cacheKey{BlockId: blockId, Name: name}]; found {
 		return curCacheEntry, true
 	} else {
 		return nil, false
@@ -294,19 +247,19 @@ func GetCacheEntryOrPopulate(ctx context.Context, blockId string, name string) (
 
 }
 
-func SetCacheEntry(ctx context.Context, cacheId string, cacheEntry *CacheEntry) {
+func setCacheEntry(ctx context.Context, key cacheKey, cacheEntry *CacheEntry) {
 	globalLock.Lock()
 	defer globalLock.Unlock()
-	if _, found := blockstoreCache[cacheId]; found {
+	if _, found := blockstoreCache[key]; found {
 		return
 	}
-	blockstoreCache[cacheId] = cacheEntry
+	blockstoreCache[key] = cacheEntry
 }
 
 func DeleteCacheEntry(ctx context.Context, blockId string, name string) {
 	globalLock.Lock()
 	defer globalLock.Unlock()
-	delete(blockstoreCache, GetCacheId(blockId, name))
+	delete(blockstoreCache, cacheKey{BlockId: blockId, Name: name})
 }
 
 func GetCacheBlock(ctx context.Context, blockId string, name string, cacheNum int, pullFromDB bool) (*CacheBlock, error) {
@@ -322,7 +275,7 @@ func GetCacheBlock(ctx context.Context, blockId string, name string, cacheNum in
 	if curCacheEntry.DataBlocks[cacheNum] == nil {
 		var curCacheBlock *CacheBlock
 		if pullFromDB {
-			cacheData, err := GetCacheFromDB(ctx, blockId, name, 0, MaxBlockSize, int64(cacheNum))
+			cacheData, err := GetCacheFromDB(ctx, blockId, name, 0, PartSize, int64(cacheNum))
 			if err != nil {
 				return nil, err
 			}
@@ -361,12 +314,8 @@ func Stat(ctx context.Context, blockId string, name string) (*FileInfo, error) {
 		return nil, err
 	}
 	curCacheEntry.Info = fInfo
-	SetCacheEntry(ctx, GetCacheId(blockId, name), curCacheEntry)
+	setCacheEntry(ctx, cacheKey{BlockId: blockId, Name: name}, curCacheEntry)
 	return DeepCopyFileInfo(fInfo), nil
-}
-
-func SetFlushTimeout(newTimeout time.Duration) {
-	flushTimeout = newTimeout
 }
 
 func GetClockString(t time.Time) string {
@@ -393,10 +342,10 @@ func WriteAt(ctx context.Context, blockId string, name string, p []byte, off int
 func WriteAtHelper(ctx context.Context, blockId string, name string, p []byte, off int64, flushCache bool) (int, error) {
 	bytesToWrite := len(p)
 	bytesWritten := 0
-	curCacheNum := int(math.Floor(float64(off) / float64(MaxBlockSize)))
-	numCaches := int(math.Ceil(float64(bytesToWrite) / float64(MaxBlockSize)))
-	cacheOffset := off - (int64(curCacheNum) * MaxBlockSize)
-	if (cacheOffset + int64(bytesToWrite)) > MaxBlockSize {
+	curCacheNum := int(math.Floor(float64(off) / float64(PartSize)))
+	numCaches := int(math.Ceil(float64(bytesToWrite) / float64(PartSize)))
+	cacheOffset := off - (int64(curCacheNum) * PartSize)
+	if (cacheOffset + int64(bytesToWrite)) > PartSize {
 		numCaches += 1
 	}
 	fInfo, err := Stat(ctx, blockId, name)
@@ -408,10 +357,10 @@ func WriteAtHelper(ctx context.Context, blockId string, name string, p []byte, o
 		off = off - (numOver * fInfo.Opts.MaxSize)
 	}
 	for index := curCacheNum; index < curCacheNum+numCaches; index++ {
-		cacheOffset := off - (int64(index) * MaxBlockSize)
-		bytesToWriteToCurCache := int(math.Min(float64(bytesToWrite), float64(MaxBlockSize-cacheOffset)))
+		cacheOffset := off - (int64(index) * PartSize)
+		bytesToWriteToCurCache := int(math.Min(float64(bytesToWrite), float64(PartSize-cacheOffset)))
 		pullFromDB := true
-		if cacheOffset == 0 && int64(bytesToWriteToCurCache) == MaxBlockSize {
+		if cacheOffset == 0 && int64(bytesToWriteToCurCache) == PartSize {
 			pullFromDB = false
 		}
 		_, b, err := WriteToCacheBlockNum(ctx, blockId, name, p, int(cacheOffset), bytesToWriteToCurCache, index, pullFromDB)
@@ -505,10 +454,10 @@ func ReadAt(ctx context.Context, blockId string, name string, p *[]byte, off int
 	}
 	endReadPos := math.Min(float64(int64(len(*p))+off), float64(fInfo.Size))
 	bytesToRead := int64(endReadPos) - off
-	curCacheNum := int(math.Floor(float64(off) / float64(MaxBlockSize)))
-	numCaches := int(math.Ceil(float64(bytesToRead) / float64(MaxBlockSize)))
-	cacheOffset := off - (int64(curCacheNum) * MaxBlockSize)
-	if (cacheOffset + int64(bytesToRead)) > MaxBlockSize {
+	curCacheNum := int(math.Floor(float64(off) / float64(PartSize)))
+	numCaches := int(math.Ceil(float64(bytesToRead) / float64(PartSize)))
+	cacheOffset := off - (int64(curCacheNum) * PartSize)
+	if (cacheOffset + int64(bytesToRead)) > PartSize {
 		numCaches += 1
 	}
 	for index := curCacheNum; index < curCacheNum+numCaches; index++ {
@@ -516,19 +465,19 @@ func ReadAt(ctx context.Context, blockId string, name string, p *[]byte, off int
 		if err != nil {
 			return bytesRead, fmt.Errorf("error getting cache block: %v", err)
 		}
-		cacheOffset := off - (int64(index) * MaxBlockSize)
+		cacheOffset := off - (int64(index) * PartSize)
 		if cacheOffset < 0 {
 			return bytesRead, nil
 		}
-		bytesToReadFromCurCache := int(math.Min(float64(bytesToRead), float64(MaxBlockSize-cacheOffset)))
+		bytesToReadFromCurCache := int(math.Min(float64(bytesToRead), float64(PartSize-cacheOffset)))
 		fileMaxSize := fInfo.Opts.MaxSize
-		maxReadSize := fileMaxSize - (int64(index) * MaxBlockSize)
+		maxReadSize := fileMaxSize - (int64(index) * PartSize)
 		b, err := ReadFromCacheBlock(ctx, blockId, name, curCacheBlock, p, int(cacheOffset), bytesToReadFromCurCache, bytesRead, maxReadSize)
 		if b == 0 {
 			log.Printf("something wrong %v %v %v %v %v %v %v %v", index, off, cacheOffset, curCacheNum, numCaches, bytesRead, bytesToRead, curCacheBlock)
 			cacheEntry, _ := GetCacheEntry(ctx, blockId, name)
 			blockSize, numNil := GetAllBlockSizes(cacheEntry.DataBlocks)
-			maybeDBSize := int64(numNil) * MaxBlockSize
+			maybeDBSize := int64(numNil) * PartSize
 			maybeFullSize := int64(blockSize) + maybeDBSize
 			log.Printf("block actual sizes: %v %v %v %v %v\n", blockSize, numNil, maybeDBSize, maybeFullSize, len(cacheEntry.DataBlocks))
 		}
@@ -569,21 +518,30 @@ func AppendData(ctx context.Context, blockId string, name string, p []byte) (int
 func DeleteFile(ctx context.Context, blockId string, name string) error {
 	DeleteCacheEntry(ctx, blockId, name)
 	err := DeleteFileFromDB(ctx, blockId, name)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteBlockFromCache(blockId string) {
+	globalLock.Lock()
+	defer globalLock.Unlock()
+	for key := range blockstoreCache {
+		if key.BlockId == blockId {
+			delete(blockstoreCache, key)
+		}
+	}
+
 }
 
 func DeleteBlock(ctx context.Context, blockId string) error {
-	for cacheId := range blockstoreCache {
-		curBlockId, name := GetValuesFromCacheId(cacheId)
-		if curBlockId == blockId {
-			err := DeleteFile(ctx, blockId, name)
-			if err != nil {
-				return fmt.Errorf("error deleting %v %v: %v", blockId, name, err)
-			}
-		}
-	}
+	deleteBlockFromCache(blockId)
 	err := DeleteBlockFromDB(ctx, blockId)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func WriteFile(ctx context.Context, blockId string, name string, meta FileMeta, opts FileOptsType, data []byte) (int, error) {

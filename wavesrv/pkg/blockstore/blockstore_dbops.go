@@ -1,3 +1,6 @@
+// Copyright 2023, Command Line Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package blockstore
 
 import (
@@ -189,6 +192,51 @@ func (fInfo *FileInfo) FromMap(m map[string]interface{}) bool {
 	return true
 }
 
+func InsertFileIntoDB(ctx context.Context, fileInfo FileInfo) error {
+	metaJson, err := json.Marshal(fileInfo.Meta)
+	if err != nil {
+		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, err)
+	}
+	txErr := WithTx(ctx, func(tx *TxWrap) error {
+		query := `INSERT INTO block_file VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		tx.Exec(query, fileInfo.BlockId, fileInfo.Name, fileInfo.Opts.MaxSize, fileInfo.Opts.Circular, fileInfo.Size, fileInfo.CreatedTs, fileInfo.ModTs, metaJson)
+		return nil
+	})
+	if txErr != nil {
+		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, txErr)
+	}
+	return nil
+}
+
+func WriteFileToDB(ctx context.Context, fileInfo FileInfo) error {
+	metaJson, err := json.Marshal(fileInfo.Meta)
+	if err != nil {
+		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, err)
+	}
+	txErr := WithTx(ctx, func(tx *TxWrap) error {
+		query := `UPDATE block_file SET blockid = ?, name = ?, maxsize = ?, circular = ?, size = ?, createdts = ?, modts = ?, meta = ? where blockid = ? and name = ?`
+		tx.Exec(query, fileInfo.BlockId, fileInfo.Name, fileInfo.Opts.MaxSize, fileInfo.Opts.Circular, fileInfo.Size, fileInfo.CreatedTs, fileInfo.ModTs, metaJson, fileInfo.BlockId, fileInfo.Name)
+		return nil
+	})
+	if txErr != nil {
+		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, txErr)
+	}
+	return nil
+
+}
+
+func WriteDataBlockToDB(ctx context.Context, blockId string, name string, index int, data []byte) error {
+	txErr := WithTx(ctx, func(tx *TxWrap) error {
+		query := `REPLACE INTO block_data values (?, ?, ?, ?)`
+		tx.Exec(query, blockId, name, index, data)
+		return nil
+	})
+	if txErr != nil {
+		return fmt.Errorf("error writing data block to db: %v", txErr)
+	}
+	return nil
+}
+
 func GetFileInfo(ctx context.Context, blockId string, name string) (*FileInfo, error) {
 	fInfoArr, txErr := WithTxRtn(ctx, func(tx *TxWrap) ([]*FileInfo, error) {
 		var rtn []*FileInfo
@@ -245,23 +293,13 @@ func DeleteFileFromDB(ctx context.Context, blockId string, name string) error {
 }
 
 func DeleteBlockFromDB(ctx context.Context, blockId string) error {
-	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `DELETE from block_file where blockid = ?`
+	return WithTx(ctx, func(tx *TxWrap) error {
+		query := `DELETE from block_file WHERE blockid = ?`
+		tx.Exec(query, blockId)
+		query = `DELETE FROM block_data WHERE blockid = ?`
 		tx.Exec(query, blockId)
 		return nil
 	})
-	if txErr != nil {
-		return txErr
-	}
-	txErr = WithTx(ctx, func(tx *TxWrap) error {
-		query := `DELETE from block_data where blockid = ?`
-		tx.Exec(query, blockId)
-		return nil
-	})
-	if txErr != nil {
-		return txErr
-	}
-	return nil
 }
 
 func GetAllFilesInDBForBlockId(ctx context.Context, blockId string) ([]*FileInfo, error) {

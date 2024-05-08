@@ -1,3 +1,6 @@
+// Copyright 2023, Command Line Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package blockstore
 
 import (
@@ -25,6 +28,7 @@ type TestBlockType struct {
 }
 
 func initTestDb(t *testing.T) {
+	flushTimeout = DefaultFlushTimeout
 	log.Printf("initTestDb: %v", t.Name())
 	os.Remove(testOverrideDBName)
 	overrideDBName = testOverrideDBName
@@ -99,7 +103,7 @@ func TestTx(t *testing.T) {
 	defer cleanupTestDB(t)
 
 	ctx := context.Background()
-	SetFlushTimeout(2 * time.Minute)
+	flushTimeout = 2 * time.Minute
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
 		query := `INSERT into block_data values ('test-block-id', 'test-file-name', 0, 256)`
 		tx.Exec(query)
@@ -224,7 +228,7 @@ func TestMakeFile(t *testing.T) {
 	log.Printf("cur file info: %v", curFileInfo)
 	SimpleAssert(t, curFileInfo.Name == "file-1", "correct file name")
 	SimpleAssert(t, curFileInfo.Meta["test-descriptor"] == true, "meta correct")
-	curCacheEntry := blockstoreCache[GetCacheId("test-block-id", "file-1")]
+	curCacheEntry := blockstoreCache[cacheKey{BlockId: "test-block-id", Name: "file-1"}]
 	curFileInfo = curCacheEntry.Info
 	log.Printf("cache entry: %v", curCacheEntry)
 	SimpleAssert(t, curFileInfo.Name == "file-1", "cache correct file name")
@@ -251,7 +255,7 @@ func TestWriteAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
-	log.Printf("Max Block Size: %v", MaxBlockSize)
+	log.Printf("Max Block Size: %v", PartSize)
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
 	cacheData, err := GetCacheBlock(ctx, "test-block-id", "file-1", 0, false)
 	if err != nil {
@@ -350,7 +354,7 @@ func TestWriteAtLeftPad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
-	log.Printf("Max Block Size: %v", MaxBlockSize)
+	log.Printf("Max Block Size: %v", PartSize)
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
 	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, 11)
 	if err != nil {
@@ -387,7 +391,7 @@ func TestReadAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
-	log.Printf("Max Block Size: %v", MaxBlockSize)
+	log.Printf("Max Block Size: %v", PartSize)
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
 	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, 0)
 	if err != nil {
@@ -439,7 +443,7 @@ func TestFlushCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
-	log.Printf("Max Block Size: %v", MaxBlockSize)
+	log.Printf("Max Block Size: %v", PartSize)
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
 	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, 0)
 	if err != nil {
@@ -583,20 +587,20 @@ func TestWriteAtMaxSizeMultipleBlocks(t *testing.T) {
 	ctx := context.Background()
 	fileMeta := make(FileMeta)
 	fileMeta["test-descriptor"] = true
-	fileOpts := FileOptsType{MaxSize: int64(MaxBlockSize * 2), Circular: false, IJson: false}
+	fileOpts := FileOptsType{MaxSize: int64(PartSize * 2), Circular: false, IJson: false}
 	err := MakeFile(ctx, "test-block-id", "file-1", fileMeta, fileOpts)
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
-	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, (MaxBlockSize*2)-4)
+	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, (PartSize*2)-4)
 	if err != nil {
 		t.Errorf("Write at error: %v", err)
 	}
 	SimpleAssert(t, bytesWritten == 4, "Correct num bytes written")
 	readTest := []byte{'T', 'E', 'S', 'T'}
 	readBuf := make([]byte, len(testBytesToWrite))
-	bytesRead, err := ReadAt(ctx, "test-block-id", "file-1", &readBuf, (MaxBlockSize*2)-4)
+	bytesRead, err := ReadAt(ctx, "test-block-id", "file-1", &readBuf, (PartSize*2)-4)
 	log.Printf("readbuf multiple: %v %v %v\n", readBuf, bytesRead, bytesWritten)
 	SimpleAssert(t, bytesRead == 4, "Correct num bytes read")
 	SimpleAssert(t, bytes.Equal(readBuf[:4], readTest), "Correct bytes read")
@@ -609,13 +613,13 @@ func TestWriteAtCircular(t *testing.T) {
 	ctx := context.Background()
 	fileMeta := make(FileMeta)
 	fileMeta["test-descriptor"] = true
-	fileOpts := FileOptsType{MaxSize: int64(MaxBlockSize * 2), Circular: true, IJson: false}
+	fileOpts := FileOptsType{MaxSize: int64(PartSize * 2), Circular: true, IJson: false}
 	err := MakeFile(ctx, "test-block-id", "file-1", fileMeta, fileOpts)
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
-	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, (MaxBlockSize*2)-4)
+	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, (PartSize*2)-4)
 	if err != nil {
 		t.Errorf("Write at error: %v", err)
 	}
@@ -623,7 +627,7 @@ func TestWriteAtCircular(t *testing.T) {
 
 	readTest := []byte{'T', 'E', 'S', 'T'}
 	readBuf := make([]byte, len(testBytesToWrite))
-	bytesRead, err := ReadAt(ctx, "test-block-id", "file-1", &readBuf, (MaxBlockSize*2)-4)
+	bytesRead, err := ReadAt(ctx, "test-block-id", "file-1", &readBuf, (PartSize*2)-4)
 	SimpleAssert(t, bytesRead == 11, "Correct num bytes read")
 	SimpleAssert(t, bytes.Equal(readBuf[:4], readTest), "Correct bytes read")
 	SimpleAssert(t, bytes.Equal(readBuf, testBytesToWrite), "Correct bytes read")
@@ -644,7 +648,7 @@ func TestWriteAtCircularWierdOffset(t *testing.T) {
 	ctx := context.Background()
 	fileMeta := make(FileMeta)
 	fileMeta["test-descriptor"] = true
-	fileSize := MaxBlockSize*2 - 500
+	fileSize := PartSize*2 - 500
 	fileOpts := FileOptsType{MaxSize: int64(fileSize), Circular: true, IJson: false}
 	err := MakeFile(ctx, "test-block-id", "file-1", fileMeta, fileOpts)
 	if err != nil {
@@ -688,7 +692,7 @@ func TestAppend(t *testing.T) {
 	ctx := context.Background()
 	fileMeta := make(FileMeta)
 	fileMeta["test-descriptor"] = true
-	fileSize := MaxBlockSize*2 - 500
+	fileSize := PartSize*2 - 500
 	fileOpts := FileOptsType{MaxSize: int64(fileSize), Circular: true, IJson: false}
 	err := MakeFile(ctx, "test-block-id", "file-1", fileMeta, fileOpts)
 	if err != nil {
@@ -925,7 +929,7 @@ func TestFlushTimer(t *testing.T) {
 	defer cleanupTestDB(t)
 
 	testFlushTimeout := 10 * time.Second
-	SetFlushTimeout(testFlushTimeout)
+	flushTimeout = testFlushTimeout
 	ctx := context.Background()
 	fileMeta := make(FileMeta)
 	fileMeta["test-descriptor"] = true
@@ -934,7 +938,7 @@ func TestFlushTimer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeFile error: %v", err)
 	}
-	log.Printf("Max Block Size: %v", MaxBlockSize)
+	log.Printf("Max Block Size: %v", PartSize)
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
 	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, 0)
 	if err != nil {
@@ -991,7 +995,7 @@ func TestWriteAtMiddle(t *testing.T) {
 	ctx := context.Background()
 	WriteLargeDataFlush(t, ctx)
 	testBytesToWrite := []byte{'T', 'E', 'S', 'T', 'M', 'E', 'S', 'S', 'A', 'G', 'E'}
-	writeOff := MaxBlockSize + 15
+	writeOff := PartSize + 15
 	bytesWritten, err := WriteAt(ctx, "test-block-id", "file-1", testBytesToWrite, writeOff)
 	if err != nil {
 		t.Errorf("Write at error: %v", err)
