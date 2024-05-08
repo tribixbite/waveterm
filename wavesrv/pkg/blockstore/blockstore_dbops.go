@@ -214,7 +214,11 @@ func WriteFileToDB(ctx context.Context, fileInfo FileInfo) error {
 		return fmt.Errorf("error writing file %s to db: %v", fileInfo.Name, err)
 	}
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `UPDATE block_file SET blockid = ?, name = ?, maxsize = ?, circular = ?, size = ?, createdts = ?, modts = ?, meta = ? where blockid = ? and name = ?`
+		query := `SELECT blockid FROM block_file WHERE blockid = ? AND name = ?`
+		if !tx.Exists(query, fileInfo.BlockId, fileInfo.Name) {
+			return fmt.Errorf("file %s:%s not found", fileInfo.BlockId, fileInfo.Name)
+		}
+		query = `UPDATE block_file SET blockid = ?, name = ?, maxsize = ?, circular = ?, size = ?, createdts = ?, modts = ?, meta = ? where blockid = ? and name = ?`
 		tx.Exec(query, fileInfo.BlockId, fileInfo.Name, fileInfo.Opts.MaxSize, fileInfo.Opts.Circular, fileInfo.Size, fileInfo.CreatedTs, fileInfo.ModTs, metaJson, fileInfo.BlockId, fileInfo.Name)
 		return nil
 	})
@@ -227,7 +231,11 @@ func WriteFileToDB(ctx context.Context, fileInfo FileInfo) error {
 
 func WriteDataBlockToDB(ctx context.Context, blockId string, name string, index int, data []byte) error {
 	txErr := WithTx(ctx, func(tx *TxWrap) error {
-		query := `REPLACE INTO block_data values (?, ?, ?, ?)`
+		query := `SELECT blockid FROM block_file WHERE blockid = ? AND name = ?`
+		if !tx.Exists(query, blockId, name) {
+			return fmt.Errorf("file %s:%s not found", blockId, name)
+		}
+		query = `REPLACE INTO block_data values (?, ?, ?, ?)`
 		tx.Exec(query, blockId, name, index, data)
 		return nil
 	})
@@ -237,27 +245,23 @@ func WriteDataBlockToDB(ctx context.Context, blockId string, name string, index 
 	return nil
 }
 
+// returns an error if the file is not found
 func GetFileInfo(ctx context.Context, blockId string, name string) (*FileInfo, error) {
-	fInfoArr, txErr := WithTxRtn(ctx, func(tx *TxWrap) ([]*FileInfo, error) {
-		var rtn []*FileInfo
-		query := `SELECT * FROM block_file WHERE name = 'file-1'`
-		marr := tx.SelectMaps(query)
-		for _, m := range marr {
-			rtn = append(rtn, dbutil.FromMap[*FileInfo](m))
+	finfo, txErr := WithTxRtn(ctx, func(tx *TxWrap) (*FileInfo, error) {
+		query := `SELECT * FROM block_file WHERE blockid = ? AND name = ?`
+		m := tx.GetMap(query, blockId, name)
+		if m == nil {
+			return nil, nil
 		}
-		return rtn, nil
+		return dbutil.FromMap[*FileInfo](m), nil
 	})
 	if txErr != nil {
 		return nil, fmt.Errorf("GetFileInfo database error: %v", txErr)
 	}
-	if len(fInfoArr) > 1 {
-		return nil, fmt.Errorf("GetFileInfo duplicate files in database")
-	}
-	if len(fInfoArr) == 0 {
+	if finfo == nil {
 		return nil, fmt.Errorf("GetFileInfo: File not found")
 	}
-	fInfo := fInfoArr[0]
-	return fInfo, nil
+	return finfo, nil
 }
 
 func GetCacheFromDB(ctx context.Context, blockId string, name string, off int64, length int64, cacheNum int64) (*[]byte, error) {

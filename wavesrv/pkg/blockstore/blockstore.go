@@ -503,11 +503,11 @@ func AppendData(ctx context.Context, blockId string, name string, p []byte) (int
 }
 
 func DeleteFile(ctx context.Context, blockId string, name string) error {
-	DeleteCacheEntry(ctx, blockId, name)
 	err := DeleteFileFromDB(ctx, blockId, name)
 	if err != nil {
 		return err
 	}
+	DeleteCacheEntry(ctx, blockId, name)
 	return nil
 }
 

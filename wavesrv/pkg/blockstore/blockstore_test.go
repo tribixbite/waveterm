@@ -917,7 +917,7 @@ func TestFlushTimer(t *testing.T) {
 	initTestDb(t)
 	defer cleanupTestDB(t)
 
-	testFlushTimeout := 10 * time.Second
+	testFlushTimeout := 2 * time.Second
 	stopFlushTimer()
 	startFlushTimer(testFlushTimeout)
 	ctx := context.Background()
