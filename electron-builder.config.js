@@ -83,6 +83,20 @@ const config = {
             category: "Development;Utility;",
         },
     },
+    win: {
+        target: "nsis",
+        icon: "public/waveterm.ico",
+        legalTrademarks: "WaveTerm is a trademark of Command Line Inc.",
+        publisherName: "Command Line Inc.",
+        fileAssociations: [
+            {
+                ext: "wtscript",
+                name: "WaveTerm Script",
+                description: "WaveTerm Script File",
+                icon: "public/waveterm.ico"
+            }
+        ]
+    },
     appImage: {
         license: "LICENSE",
     },
