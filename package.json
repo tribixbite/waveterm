@@ -109,7 +109,9 @@
         "yaml": "^2.4.0"
     },
     "scripts": {
-        "postinstall": "electron-builder install-app-deps"
+        "postinstall": "electron-builder install-app-deps",
+        "build:windows": "yarn run build && electron-builder build --windows",
+        "start:windows": "electron ."
     },
     "packageManager": "yarn@4.1.1"
 }

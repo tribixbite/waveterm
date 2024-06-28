@@ -1,5 +1,7 @@
 # Build Instructions for Wave Terminal on Linux
 
+> **Note for Windows users:** For instructions on setting up the development environment on Windows, please see [Windows Build Instructions](./BUILD-WINDOWS.md).
+
 These instructions are for setting up the build on Linux (Ubuntu).
 If you're developing on MacOS please use the [MacOS Build Instructions](./BUILD.md).
 If you are working on a different Linux distribution, you may need to adapt some of these instructions to fit your environment.
